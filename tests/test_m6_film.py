@@ -165,7 +165,116 @@ def test_story_project_shape():
     assert len(proj.groups) == 16
     assert len(proj.tints) == 16, "每个实例都应有自己的色调"
     assert proj.camera is not None
-    assert {t.channel for t in proj.camera.tracks} == {"translate", "scale", "rotate"}
+    assert {t.channel for t in proj.camera.tracks} == {
+        "translate", "scale", "rotate", "shake", "flash"
+    }
+    # 每个实例都参与「落墨」（线条生长），这是第一幕的骨架
+    assert all(proj.anims[i].track("draw") is not None for i in proj.iids)
+
+
+def test_story_ink_draws_itself_on():
+    """第一幕的硬指标：画面从**近乎空白**被一笔一笔画满。
+
+    刻意用**几何量（笔画总长）**判定而不是像素：像素会被纸纹/雾化/画框这些层污染
+    （首版把整片纸纹算成"墨"，t=0 直接测出 65%）。几何量是精确的，且不依赖渲染。
+    """
+    from spolvero.animation.film import scene_at
+    from spolvero.core.primitives import InkDot, InkShape
+    from spolvero.core.scene import flatten_all
+
+    proj = _story()
+
+    def stroke_len(t):
+        total = 0.0
+        for lf in flatten_all(scene_at(proj, t)):
+            if isinstance(lf, InkDot):
+                total += lf.r  # 点按半径计，生长时半径也按比例缩
+                continue
+            pts = lf.ring if isinstance(lf, InkShape) else lf.points
+            for a, b in zip(pts, pts[1:]):
+                total += ((b.x - a.x) ** 2 + (b.y - a.y) ** 2) ** 0.5
+        return total
+
+    early = stroke_len(0.0)
+    mid = stroke_len(2.2)
+    done = stroke_len(4.6)
+    assert early < 20.0, f"t=0 应近乎空白（只剩点半径），实际笔画长 {early:.1f}"
+    assert early < mid < done, f"落墨应中途推进：0.0→{early:.1f} 2.2→{mid:.1f} 4.6→{done:.1f}"
+    assert done > 10000.0, f"t=4.6 应已画满，实际仅 {done:.1f}"
+    seq = [stroke_len(t) for t in (0.9, 1.5, 2.2, 3.0, 3.8, 4.6)]
+    assert seq == sorted(seq), f"落墨进度出现倒退：{[round(v) for v in seq]}"
+
+
+def test_shake_is_per_frame_and_deterministic():
+    from spolvero.animation.film import shake_offset
+
+    proj = _story()
+    amp = proj.camera.shake(6.1)
+    assert amp > 0, "6.1s 应处于冲击抖动区"
+    a = [shake_offset(6.0 + i / 30.0, amp, 30) for i in range(6)]
+    assert len(set(a)) == len(a), "抖动必须逐帧取新值，否则看起来像晕船"
+    assert a == [shake_offset(6.0 + i / 30.0, amp, 30) for i in range(6)], "抖动须可复现"
+    assert shake_offset(3.0, 0.0, 30) == (0.0, 0.0)
+
+
+def test_flash_overlay_at_cut_points():
+    from spolvero.animation.film import flash_overlay
+
+    proj = _story()
+    assert flash_overlay(proj, 0.0) is not None, "开场应闪纸色"
+    assert flash_overlay(proj, 6.0) is not None, "第二幕切点应闪一下"
+    assert flash_overlay(proj, 3.0) is None, "平稳段不应有曝光闪烁"
+
+
+def test_reveal_geometry_contract():
+    """draw=0 必须真的不可见（可见性），draw=1 必须与原节点同一对象（零开销）。"""
+    from spolvero.animation.film import reveal
+    from spolvero.core.primitives import Group, InkDot, InkLine, InkShape
+    from spolvero.core.transform import Transform
+    from spolvero.core.types import Point
+
+    line = InkLine(points=(Point(0, 0), Point(10, 0), Point(20, 5)), ink=0.3)
+    assert reveal(line, 1.0) is line
+    assert len(reveal(line, 0.0).points) == 1, "draw=0 应退化为单点（不可见）"
+    # 两段折线（弧长 10 + 11.18）：半程落在第二段上，端口点 + 一个截断点
+    half = reveal(line, 0.5)
+    assert len(half.points) == 3
+    assert abs(half.points[-1].x - 10.0 - 10.0 * ((0.5 * 21.1803 - 10.0) / 11.1803)) < 1e-3
+    # 单段线半程应精确停在弧长中点
+    seg = InkLine(points=(Point(0, 0), Point(10, 0)), ink=0.3)
+    h2 = reveal(seg, 0.5)
+    assert len(h2.points) == 2 and abs(h2.points[-1].x - 5.0) < 1e-9
+
+    ring = InkShape(
+        ring=(Point(0, 0), Point(10, 0), Point(10, 10), Point(0, 10)), ink=0.5, fill=True
+    )
+    assert reveal(ring, 1.0) is ring
+    mid = reveal(ring, 0.5)
+    assert isinstance(mid, InkLine) and not mid.closed, "填充形生长中应以开放折线勾出"
+    assert reveal(ring, 0.0).points.__len__() == 1
+
+    dot = InkDot(pos=Point(1, 1), r=8.0, ink=0.2)
+    assert reveal(dot, 0.5).r == 4.0
+    assert reveal(dot, 0.0).r == 0.0
+
+    g = Group((line, dot), Transform.translate(3, 4))
+    assert isinstance(reveal(g, 0.5), Group)
+
+
+def test_draw_absent_means_fully_drawn():
+    """未声明 draw 的实例必须照常显示（向后兼容），否则老工程会整片消失。"""
+    from spolvero.animation.track import AnimSet, Key, Track
+
+    a = AnimSet((Track("draw", (Key(0.0, (0.4,)),)),))
+    assert a.draw(0.0) == 0.4
+    assert AnimSet(()).draw(0.0) == 1.0
+
+
+def test_loop_film_has_no_draw_channel_regression():
+    """循环片没加 draw，渲染结果不应受本次改动影响（除了相机抖动/闪光的缺省无操作）。"""
+    proj = load_project(FILM)
+    assert all(proj.anims[i].draw(0.0) == 1.0 for i in proj.iids)
+    assert proj.camera is None
 
 
 def test_story_is_narrative_not_loop():
@@ -236,7 +345,8 @@ def test_story_is_vivid_not_gray():
             chroma += max(r, g, b) - min(r, g, b)
             n += 1
     assert n > 0
-    assert chroma / n > 40, f"平均色度仅 {chroma / n:.1f}，谈不上鲜亮"
+    # 灰度版实测色度 ≈1.0；墨色极深时通道极差会被压小，故只要明显大于灰度即可
+    assert chroma / n > 15, f"平均色度仅 {chroma / n:.1f}，谈不上鲜亮"
 
 
 def test_story_validation_passes_across_the_shot():

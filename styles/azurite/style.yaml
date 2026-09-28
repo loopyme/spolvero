@@ -30,3 +30,12 @@ texture:
   stroke_coherence: 0.0
   grain: 0.0
   edge_hardness: 1.0
+effects:
+  material: 1.0
+  ramp: 1.0
+  hatch: 0.95
+  glow: 1.0
+  vignette: 0.1
+  haze: 0.22
+  border: true
+  boil_fps: 12

@@ -40,7 +40,7 @@ EXAMPLES = os.path.join(ROOT, "examples")
 # (工程目录名, 产物前缀, 风格, 海报帧时刻, 分镜格时刻, 是否循环片)
 JOBS = [
     ("lonely_boat_story", "lonely_boat_story", "azurite", 7.0,
-     (0.0, 2.0, 4.0, 6.0, 8.0, 9.9), False),
+     (0.7, 1.5, 2.4, 3.4, 5.0, 7.0, 9.9), False),
     ("lonely_boat_film", "lonely_boat_film", "eastern_minimal", 0.0,
      (0.0, 1.0, 2.0, 3.0), True),
 ]
@@ -52,6 +52,20 @@ CHECK_TIMES = (None, 2.5, 5.0, 7.5)
 def _sha(b) -> str:
     raw = b.encode("utf-8") if isinstance(b, str) else b
     return hashlib.sha256(raw).hexdigest()
+
+
+def render_svg_frame(project, t: float, style) -> str:
+    """SVG 海报帧：走 api 的着色/取景逻辑，但 SVG 后端不加光栅质感层（见 render.backend 说明）。"""
+    from spolvero.api import _bg_of, _styled_groups
+    from spolvero.render.backend import render
+
+    return render(
+        _styled_groups(project, style, t),
+        backend="svg",
+        width=int(project.width),
+        height=int(project.height),
+        bg=_bg_of(project, style),
+    )
 
 
 def _check_across_time(proj) -> dict:
@@ -102,27 +116,12 @@ def _run_job(dirname: str, prefix: str, style_id: str, poster_t: float,
 
     # 2. 海报帧（挑叙事最强的一刻）
     print(f"\n[2/6] 海报帧 t={poster_t}s")
-    poster_png = render_project(proj, "skia", style=style)
-    png_path = os.path.join(EXAMPLES, f"{prefix}.png")
-    svg_path = os.path.join(EXAMPLES, f"{prefix}.svg")
     from spolvero.api import render_frame_at
 
-    from spolvero.animation.film import scene_at
-    from spolvero.styles.apply import recolor
-    from spolvero.render.backend import render
-
-    def _render_at(t, backend):
-        groups = scene_at(proj, t)
-        tints = proj.tints or {}
-        if len(groups) == len(proj.groups):
-            styled = [recolor(g, style, tints.get(proj.iids[i])) for i, g in enumerate(groups)]
-        else:
-            styled = [recolor(g, style) for g in groups]
-        return render(styled, backend=backend, width=proj.width, height=proj.height,
-                      bg=style.paper_rgb)
-
-    poster_png = _render_at(poster_t, "skia")
-    poster_svg = _render_at(poster_t, "svg")
+    poster_png = render_frame_at(proj, poster_t, "skia", style)
+    poster_svg = render_svg_frame(proj, poster_t, style)
+    png_path = os.path.join(EXAMPLES, f"{prefix}.png")
+    svg_path = os.path.join(EXAMPLES, f"{prefix}.svg")
     with open(png_path, "wb") as f:
         f.write(poster_png)
     with open(svg_path, "w", encoding="utf-8") as f:

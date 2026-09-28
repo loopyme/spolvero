@@ -129,9 +129,20 @@ _AZURITE: Dict = {
         "axis_deg": 0.0,
     },
     "texture": {"stroke_coherence": 0.0, "grain": 0.0, "edge_hardness": 1.0},
+    # 作画痕迹层（M7 前置）：石青重彩是"画出来的"，所以这层全开
+    "effects": {
+        "material": 1.0,   # 纸纹 / 颜料颗粒 / 纤维
+        "ramp": 1.0,       # 形体明暗（不设光源的体积）
+        "hatch": 0.95,     # 蚀刻排线
+        "glow": 1.0,       # 月与灯的光晕
+        "vignette": 0.10,  # 极淡暗角（重了会让留白发灰）
+        "haze": 0.22,      # 大气透视
+        "border": True,    # 不均匀冲印画框
+        "boil_fps": 12,    # 纸纹 12fps 换帧（手作感）
+    },
 }
-# 注意：**不设 color_area_max**——本风格的目标就是「鲜亮」，用彩面积上限去卡它与设计意图相悖。
 _AZURITE_CONSTRAINTS: Dict = {
+    # 注意：**不设 color_area_max**——本风格的目标就是「鲜亮」，用彩面积上限去卡它与设计意图相悖。
     "severity": "warning",
     "as_error": [],
     "whitespace_min": 0.60,

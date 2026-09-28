@@ -78,8 +78,8 @@ def scene(ids) -> List[Group]:
 
 
 # golden 帧哈希（L1 同机同版本 byte-identical，CI 卡死）。首次运行后回填。
-GOLDEN_SVG_HASH = "1334906ac520900329aef27492261b73c9fc9f23e8cdd5391dc84d0cb7a478df"
-GOLDEN_PNG_HASH = "d275316f41ca9a0899bd8bbf835b11fbee8fe0707d688894df6859a926af5638"
+GOLDEN_SVG_HASH = "1d5c0d65608fb8f0bceb0b781af6196eac22c081edb06b8019eae03b5dd809cc"
+GOLDEN_PNG_HASH = "2d39cafef1aa9d0a377751ab95a71982c871dc4f7affcf689bac53f28a235bbf"
 
 
 def test_derive_stable_under_insertion():

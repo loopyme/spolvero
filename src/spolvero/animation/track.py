@@ -20,9 +20,18 @@ from spolvero.core.transform import Transform
 
 Vec = Tuple[float, ...]
 
-CHANNELS = ("translate", "rotate", "scale", "ink_shift")
+CHANNELS = ("translate", "rotate", "scale", "ink_shift", "draw", "shake", "flash")
 # 各通道的值维度（用于校验 + 默认值）
-_ARITY = {"translate": 2, "rotate": 1, "scale": 1, "ink_shift": 1}
+_ARITY = {
+    "translate": 2,
+    "rotate": 1,
+    "scale": 1,
+    "ink_shift": 1,
+    # —— 演进出的动画手段（M7 前置）——
+    "draw": 1,   # 线条生长 0→1：按弧长截断几何，笔画「自己画出来」
+    "shake": 1,  # 相机抖动幅度（像素）：逐帧整数哈希偏移，一格一抖
+    "flash": 1,  # 曝光闪烁：>0 闪向纸色、<0 闪向黑，绝对值即强度
+}
 
 
 @dataclass(frozen=True)
@@ -90,6 +99,19 @@ class AnimSet:
 
     def ink_shift(self, t: float) -> float:
         v = self.value("ink_shift", t)
+        return v[0] if v else 0.0
+
+    def draw(self, t: float) -> float:
+        """线条生长进度。缺通道时返回 1.0（已画完），而非 0——否则未声明 draw 的实例会整片消失。"""
+        v = self.value("draw", t)
+        return v[0] if v else 1.0
+
+    def shake(self, t: float) -> float:
+        v = self.value("shake", t)
+        return v[0] if v else 0.0
+
+    def flash(self, t: float) -> float:
+        v = self.value("flash", t)
         return v[0] if v else 0.0
 
     def delta_transform(self, t: float, ax: float = 0.0, ay: float = 0.0) -> Transform:

@@ -37,5 +37,5 @@
   pattern: moon
   params:
     - {name: r, default: 20.0, lo: 8.0, hi: 30.0, kind: float}
-    - {name: ink, default: 0.18, lo: 0.05, hi: 0.40, kind: float}
+    - {name: ink, default: 0.18, lo: 0.05, hi: 0.92, kind: float}
     - {name: halo, default: true, kind: bool, p_true: 0.5}

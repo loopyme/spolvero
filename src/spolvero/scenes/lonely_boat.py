@@ -14,7 +14,7 @@ from spolvero.core.transform import Transform
 LONELY_BOAT_SEED = "spolvero-lonely-boat-v1"
 
 INSTANCES: List[Instance] = [
-    Instance("moon", "moon", {"r": 24, "ink": 0.16, "halo": True},
+    Instance("moon", "moon", {"r": 24, "ink": 0.88, "halo": True},
              Transform.translate(1230, 175)),
 
     Instance("mountain", "m1", {"width": 300, "height": 72, "ink": 0.80, "jag": 0.5},

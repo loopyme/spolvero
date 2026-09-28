@@ -24,8 +24,8 @@ from spolvero.scenes import LONELY_BOAT_SEED, lonely_boat_scene
 SEED = "spolvero-m2-test"
 
 # golden 帧哈希（L1 同机同版本 byte-identical，CI 卡死）
-GOLDEN_LONELY_PNG = "64de3c735259ea26abdee21a7b8ba3f3cc02f82b68803b02a2ec1565bed9e589"
-GOLDEN_LONELY_SVG = "ab6f822f59fde43e376a612a947f40dc6090e584819bc5fb45268efea44eabef"
+GOLDEN_LONELY_PNG = "2f3c494889254f984609b79fc70811bd043d6b4b873cfdecccb33d2b50eded02"
+GOLDEN_LONELY_SVG = "7e1e5b7853635c1359e8fe042e8056d23ef0e40cef099a558a925ebf9bf9c399"
 
 
 def _hull_of(group: Group) -> InkShape:

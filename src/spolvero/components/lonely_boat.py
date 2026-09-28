@@ -178,7 +178,7 @@ def _build_water(params: dict, seed: str, iid: str) -> Group:
 # ─────────────────────────── moon（月）───────────────────────────
 MOON_PARAMS = [
     ParamSpec("r", 20.0, 8.0, 30.0, "float"),
-    ParamSpec("ink", 0.18, 0.05, 0.40, "float"),
+    ParamSpec("ink", 0.18, 0.05, 0.92, "float"),  # ink 高=浅：月为浅盘
     ParamSpec("halo", True, p_true=0.5, kind="bool"),
 ]
 
@@ -189,7 +189,7 @@ def _build_moon(params: dict, seed: str, iid: str) -> Group:
     children = [InkDot(pos=Point(0.0, 0.0), r=r, ink=ink)]
     if params["halo"]:
         ring = _circle(0.0, 0.0, r * 1.9, 12)
-        children.append(InkLine(points=tuple(ring), closed=True, ink=min(0.9, ink + 0.18)))
+        children.append(InkLine(points=tuple(ring), closed=True, ink=max(0.05, ink - 0.26)))
     return Group(tuple(children), Transform.identity())
 
 

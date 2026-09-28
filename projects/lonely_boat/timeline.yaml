@@ -4,7 +4,7 @@
 items:
   - component: moon
     iid: moon
-    overrides: {r: 24, ink: 0.16, halo: true}
+    overrides: {r: 24, ink: 0.88, halo: true}
     transform: {translate: [1230, 175]}
 
   - component: mountain

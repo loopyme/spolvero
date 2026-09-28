@@ -116,6 +116,69 @@ class Texture:
 
 
 @dataclass(frozen=True)
+class Effects:
+    """作画痕迹层（M7 前置）的开关与强度。
+
+    对应 SPEC §3 红线 5 的可执行边界：这是**层**，不是主渲染——
+    置零即回到纯矢量输出，画面结构依然完整成立。
+
+    全部 0 / False 时渲染路径与从前逐字节一致（老 golden 不动）。
+    """
+
+    material: float = 0.0   # 纸纹 / 颜料颗粒 / 纤维（三尺度噪声）
+    ramp: float = 0.0       # 形体明暗分带（不设光源的"光感"）
+    hatch: float = 0.0      # 蚀刻排线（填充形内按弧长密度做体积）
+    glow: float = 0.0       # 点光源晕（月/灯；emission，非照明）
+    vignette: float = 0.0   # 暗角
+    haze: float = 0.0       # 大气透视（向纸色靠拢）
+    border: bool = False    # 不均匀冲印画框
+    boil_fps: int = 12      # 纸纹换帧率（print boil）；0 = 不抖
+
+    def to_dict(self) -> Dict:
+        return {
+            "material": self.material,
+            "ramp": self.ramp,
+            "hatch": self.hatch,
+            "glow": self.glow,
+            "vignette": self.vignette,
+            "haze": self.haze,
+            "border": self.border,
+            "boil_fps": self.boil_fps,
+        }
+
+    @classmethod
+    def from_dict(cls, d: Optional[Dict]) -> "Effects":
+        d = d or {}
+        return cls(
+            material=float(d.get("material", 0.0)),
+            ramp=float(d.get("ramp", 0.0)),
+            hatch=float(d.get("hatch", 0.0)),
+            glow=float(d.get("glow", 0.0)),
+            vignette=float(d.get("vignette", 0.0)),
+            haze=float(d.get("haze", 0.0)),
+            border=bool(d.get("border", False)),
+            boil_fps=int(d.get("boil_fps", 12)),
+        )
+
+    def runtime(self, t: float, paper_rgb: Tuple[int, int, int], seed: int = 4821):
+        """解析出某一帧的 EffectsRuntime（含 boil 换帧种子）。"""
+        from spolvero.render.effects import EffectsRuntime
+
+        phase = int(t * self.boil_fps) if self.boil_fps > 0 else 0
+        return EffectsRuntime(
+            material=self.material,
+            ramp=self.ramp,
+            hatch=self.hatch,
+            glow=self.glow,
+            vignette=self.vignette,
+            haze=self.haze,
+            border=self.border,
+            paper_rgb=paper_rgb,
+            grain_seed=seed + phase * 977,
+        )
+
+
+@dataclass(frozen=True)
 class StyleAsset:
     """一份可复用的风格预设资产。"""
 
@@ -129,6 +192,7 @@ class StyleAsset:
     tone: Tone = field(default_factory=Tone)
     composition: CompositionFingerprint = field(default_factory=CompositionFingerprint)
     texture: Texture = field(default_factory=Texture)
+    effects: Effects = field(default_factory=Effects)
     sources: Tuple[Dict, ...] = ()
     constraints: Dict = field(default_factory=dict)
     origin: str = "builtin"  # builtin（手写） | transcribed（转录）
@@ -154,6 +218,7 @@ class StyleAsset:
             "tone": self.tone.to_dict(),
             "composition": self.composition.to_dict(),
             "texture": self.texture.to_dict(),
+            "effects": self.effects.to_dict(),
         }
 
     def constraints_dict(self) -> Dict:
@@ -175,6 +240,7 @@ class StyleAsset:
             tone=Tone.from_dict(style_d.get("tone")),
             composition=CompositionFingerprint.from_dict(style_d.get("composition")),
             texture=Texture.from_dict(style_d.get("texture")),
+            effects=Effects.from_dict(style_d.get("effects")),
             sources=tuple(style_d.get("sources", ()) or ()),
             constraints=c,
             origin=str(style_d.get("origin", "builtin")),
@@ -188,11 +254,25 @@ class StyleAsset:
         return parse_hex(self.tone.paper)
 
     def summary(self) -> str:
+        fx = self.effects
+        tag = "—"
+        if not fx.to_dict() or any(
+            (fx.material, fx.ramp, fx.hatch, fx.glow, fx.vignette, fx.haze)
+        ) or fx.border:
+            on = [
+                n for n, v in (
+                    ("纹", fx.material), ("明", fx.ramp), ("线", fx.hatch),
+                    ("晕", fx.glow), ("角", fx.vignette), ("雾", fx.haze),
+                ) if v
+            ]
+            if fx.border:
+                on.append("框")
+            tag = "".join(on) or "—"
         return (
             f"{self.id:20s} {self.name:14s} "
             f"{'灰度' if self.grayscale else '彩色':<4s} "
             f"ink={self.default_ink:.2f} accents={len(self.tone.accents)} "
-            f"[{self.origin}]"
+            f"fx={tag:6s} [{self.origin}]"
         )
 
 

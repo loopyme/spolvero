@@ -58,6 +58,14 @@ def _bg_of(project: Project, style: Optional[StyleAsset]) -> Bg:
     return style.paper_rgb if style is not None else project.background
 
 
+def _fx_of(style: Optional[StyleAsset], t: float):
+    """作画痕迹层的逐帧参数（boil 换帧也在里面算）。无风格或全零时返回 None。"""
+    if style is None:
+        return None
+    fx = style.effects.runtime(t, style.paper_rgb)
+    return None if fx.is_noop else fx
+
+
 def render_project(
     project: Project,
     backend: str = "skia",
@@ -74,6 +82,7 @@ def render_project(
         width=int(width or project.width),
         height=int(height or project.height),
         bg=_bg_of(project, style),
+        fx=_fx_of(style, 0.0),
     )
 
 
@@ -85,7 +94,8 @@ def render_frame_at(
     width: Optional[int] = None,
     height: Optional[int] = None,
 ):
-    """渲染 t 时刻的帧。"""
+    """渲染 t 时刻的帧（含线条生长、相机抖动与曝光闪烁）。"""
+    from spolvero.animation.film import flash_overlay
     from spolvero.render.backend import render
 
     return render(
@@ -94,6 +104,8 @@ def render_frame_at(
         width=int(width or project.width),
         height=int(height or project.height),
         bg=_bg_of(project, style),
+        overlay=flash_overlay(project, t),
+        fx=_fx_of(style, t),
     )
 
 
@@ -162,7 +174,8 @@ def _encode_styled_frames(project, out_path, style, fps, duration, width, height
     try:
         total = int(round(dur * fps))
         for i in range(total):
-            png = render_frame_at(project, i / fps, "skia", style, w, h)
+            t = i / fps
+            png = render_frame_at(project, t, "skia", style, w, h)
             writer.send(png_to_rgb(png))
             hashes.append(frame_hash(png))
             n += 1

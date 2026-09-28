@@ -5,19 +5,26 @@
 
 from __future__ import annotations
 
-from typing import List, Sequence, Tuple
+from typing import List, Optional, Sequence, Tuple
 
 from spolvero.core.primitives import InkDot, InkLine, InkShape
 from spolvero.render.common import color_of
 
 Bg = Tuple[int, int, int]
+Overlay = Tuple[int, int, int, float]
 
 
 def _fmt_pts(pts) -> str:
     return " ".join(f"{p.x:.3f},{p.y:.3f}" for p in pts)
 
 
-def render_svg(leaves: Sequence, width: int, height: int, bg: Bg) -> str:
+def render_svg(
+    leaves: Sequence,
+    width: int,
+    height: int,
+    bg: Bg,
+    overlay: Optional[Overlay] = None,
+) -> str:
     r, g, b = bg
     out: List[str] = [
         f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" '
@@ -47,6 +54,13 @@ def render_svg(leaves: Sequence, width: int, height: int, bg: Bg) -> str:
             out.append(
                 f'<circle cx="{leaf.pos.x:.3f}" cy="{leaf.pos.y:.3f}" '
                 f'r="{leaf.r:.3f}" fill="{stroke}"/>'
+            )
+    if overlay is not None:
+        orr, ogg, obb, oa = overlay
+        if oa > 0.0:
+            out.append(
+                f'<rect width="{width}" height="{height}" fill="rgb({orr},{ogg},{obb})" '
+                f'fill-opacity="{min(1.0, oa):.4f}"/>'
             )
     out.append("</svg>")
     return "".join(out)

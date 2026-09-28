@@ -99,7 +99,7 @@ def tint_stops(asset: StyleAsset, tint: str) -> List[Stop]:
         (1.0, paper),
         (0.74, mix(t, paper, 0.58)),  # 淡：远景/雾中
         (0.34, t),                    # 本色：主体
-        (0.0, darken(t, 0.40)),       # 深：近景/重墨
+        (0.0, darken(t, 0.28)),       # 深：近景/重墨（少压一点：压到 0.40 会把彩度也压没了）
     ]
 
 

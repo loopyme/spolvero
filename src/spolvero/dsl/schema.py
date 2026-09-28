@@ -15,7 +15,16 @@ _ANIM_CHANNEL_SCHEMA = {
     "properties": {
         "channel": {
             "type": "string",
-            "enum": ["translate", "rotate", "scale", "ink_shift"],
+            "enum": [
+                "translate",
+                "rotate",
+                "scale",
+                "ink_shift",
+                # 动画手段：线条生长 / 相机抖动 / 曝光闪烁
+                "draw",
+                "shake",
+                "flash",
+            ],
         },
         "ease": {"type": "string", "enum": ["linear", "smooth", "in", "out"]},
         "keys": {

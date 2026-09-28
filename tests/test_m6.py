@@ -46,7 +46,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PROJECT = os.path.join(ROOT, "projects", "lonely_boat")
 
 # M3 灰度 golden（eastern_minimal 为灰度风格，着色必须恒等，不得改动它）
-GOLDEN_GRAYSCALE_PNG = "64de3c735259ea26abdee21a7b8ba3f3cc02f82b68803b02a2ec1565bed9e589"
+GOLDEN_GRAYSCALE_PNG = "2f3c494889254f984609b79fc70811bd043d6b4b873cfdecccb33d2b50eded02"
 
 
 def _sq(ink=0.5, color=None) -> InkShape:

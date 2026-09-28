@@ -250,13 +250,18 @@ def _cmd_style(args: argparse.Namespace) -> int:
         return 0
 
     if args.style_cmd == "export":
+        # 必须导**引擎内置基线**，不能走 list_styles——list_styles 会让 styles/ 里的落盘版
+        # 覆盖同 id 的内置版，于是"导出"只是把旧文件原样写回，新预设永远出不来（自我循环）。
+        from spolvero.styles.presets import builtin_styles
+
         n = 0
-        for a in list_styles(root):
-            if not args.id or args.id == a.id:
-                save_style(a, root)
-                print(f"wrote {root}/{a.id}/style.yaml, constraints.yaml, preview.png")
-                n += 1
-        print(f"导出 {n} 套预设到 {root}/")
+        for sid, a in sorted(builtin_styles().items()):
+            if args.id and args.id != sid:
+                continue
+            save_style(a, root)
+            print(f"wrote {root}/{sid}/style.yaml, constraints.yaml, preview.png")
+            n += 1
+        print(f"导出 {n} 套内置预设到 {root}/")
         return 0 if n else 2
 
     return 2
