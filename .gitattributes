@@ -1,0 +1,8 @@
+# 统一以 LF 换行，跨平台协作一致
+* text=auto eol=lf
+
+# 二进制资源
+*.png binary
+*.svg text
+*.jpg binary
+*.gz binary

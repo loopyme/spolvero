@@ -1,0 +1,27 @@
+# ── Python ──
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.pytest_cache/
+
+# ── 虚拟环境（隔离在 .workbuddy 内，不在仓库） ──
+venv/
+.venv/
+env/
+
+# ── WorkBuddy 工具目录（项目记忆，非源码） ──
+.workbuddy/
+
+# ── OS / 编辑器 ──
+.DS_Store
+Thumbs.db
+*.swp
+*~
+.idea/
+.vscode/
+
+# ── 临时渲染产物（CLI 默认输出，已被 gitignore；examples/ 作为展示保留） ──
+render.svg
+render.png

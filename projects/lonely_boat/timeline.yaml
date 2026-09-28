@@ -1,0 +1,50 @@
+# 「孤舟渡江」时序层（M3 静态片段；动画轨 M5 接入）
+# 构图：大量留白；月悬右上；三重远山压低地平线；水纹横贯；孤舟为视觉重心；远岸小舟平衡留白。
+# 布局由显式 transform 控制，与实例顺序无关（命门补充）。顺序即绘制顺序（后者覆盖前者）。
+items:
+  - component: moon
+    iid: moon
+    overrides: {r: 24, ink: 0.16, halo: true}
+    transform: {translate: [1230, 175]}
+
+  - component: mountain
+    iid: m1
+    overrides: {width: 300, height: 72, ink: 0.80, jag: 0.5}
+    transform: {translate: [330, 374]}
+  - component: mountain
+    iid: m2
+    overrides: {width: 250, height: 54, ink: 0.84, jag: 0.3}
+    transform: {translate: [880, 360]}
+  - component: mountain
+    iid: m3
+    overrides: {width: 180, height: 42, ink: 0.86, jag: 0.6}
+    transform: {translate: [1330, 380]}
+
+  - component: water
+    iid: w1
+    overrides: {width: 940, lines: 4, amp: 4, ink: 0.22, spacing: 15}
+    transform: {translate: [360, 560]}
+  - component: water
+    iid: w2
+    overrides: {width: 520, lines: 3, amp: 3, ink: 0.26, spacing: 14}
+    transform: {translate: [1120, 620]}
+  - component: water
+    iid: w3
+    overrides: {width: 760, lines: 3, amp: 5, ink: 0.20, spacing: 18}
+    transform: {translate: [540, 730]}
+  - component: water
+    iid: w_boat
+    overrides: {width: 300, lines: 2, amp: 3, ink: 0.24, spacing: 16}
+    transform: {translate: [838, 700]}
+
+  - component: boat
+    iid: boat_main
+    overrides: {length: 132, beam_ratio: 0.20, hull_ink: 0.24,
+                has_canopy: true, canopy_w: 0.46, canopy_h: 0.17,
+                has_mast: false, has_lamp: true, tilt: -1.0}
+    transform: {translate: [838, 648]}
+  - component: boat
+    iid: boat_far
+    overrides: {length: 38, beam_ratio: 0.24, hull_ink: 0.55,
+                has_canopy: true, has_mast: false, has_lamp: false, tilt: 0.8}
+    transform: {translate: [250, 478]}

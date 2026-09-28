@@ -1,0 +1,41 @@
+# 「孤舟渡江」构件库定义（声明式资产）
+# pattern 引用引擎内置构建模式（红线性：AI 只产出此处数据，绝不生成构建代码）。
+# 必须与 src/spolvero/components/lonely_boat.py 的 LONELY_BOAT_COMPONENT_SPECS 保持一致（测试守护）。
+- name: boat
+  pattern: boat
+  params:
+    - {name: length, default: 64.0, lo: 30.0, hi: 150.0, kind: float}
+    - {name: beam_ratio, default: 0.22, lo: 0.16, hi: 0.30, kind: float}
+    - {name: hull_ink, default: 0.32, lo: 0.10, hi: 0.85, kind: float}
+    - {name: canopy_w, default: 0.42, lo: 0.30, hi: 0.55, kind: float}
+    - {name: canopy_h, default: 0.14, lo: 0.08, hi: 0.22, kind: float}
+    - {name: mast_h, default: 0.62, lo: 0.35, hi: 0.90, kind: float}
+    - {name: tilt, default: 0.0, lo: -4.0, hi: 4.0, kind: float}
+    - {name: has_canopy, default: true, kind: bool, p_true: 0.66}
+    - {name: has_mast, default: false, kind: bool, p_true: 0.34}
+    - {name: has_lamp, default: false, kind: bool, p_true: 0.40}
+
+- name: mountain
+  pattern: mountain
+  params:
+    - {name: width, default: 180.0, lo: 90.0, hi: 320.0, kind: float}
+    - {name: height, default: 54.0, lo: 24.0, hi: 110.0, kind: float}
+    - {name: jag, default: 0.4, lo: 0.0, hi: 1.0, kind: float}
+    - {name: ink, default: 0.72, lo: 0.55, hi: 0.88, kind: float}
+
+- name: water
+  pattern: water
+  params:
+    - {name: width, default: 240.0, lo: 120.0, hi: 1000.0, kind: float}
+    - {name: lines, default: 3, lo: 2, hi: 4, kind: int}
+    - {name: amp, default: 3.0, lo: 1.0, hi: 7.0, kind: float}
+    - {name: spacing, default: 13.0, lo: 8.0, hi: 22.0, kind: float}
+    - {name: base, default: 0.0, lo: -40.0, hi: 20.0, kind: float}
+    - {name: ink, default: 0.30, lo: 0.12, hi: 0.55, kind: float}
+
+- name: moon
+  pattern: moon
+  params:
+    - {name: r, default: 20.0, lo: 8.0, hi: 30.0, kind: float}
+    - {name: ink, default: 0.18, lo: 0.05, hi: 0.40, kind: float}
+    - {name: halo, default: true, kind: bool, p_true: 0.5}

@@ -1,0 +1,10 @@
+# 东方极简符号构成风格预设
+# grayscale: true → 当前仅按 ink 灰度渲染；palette 为后续彩色主题预留（schema 已就绪）。
+name: eastern_minimal
+description: 东方极简符号构成（留白、线条节奏、克制点染）
+default_ink: 0.30
+grayscale: true
+palette:
+  ink: "#1a1a1a"
+  paper: "#F7F5F0"
+  accent: "#9a3b30"
