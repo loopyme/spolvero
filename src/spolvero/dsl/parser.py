@@ -109,7 +109,8 @@ def _parse_primitive(spec: dict, idx: int) -> Group:
     return Group((leaf,), t)
 
 
-def _parse_item(item: dict, idx: int, lib: ComponentLibrary, seed: str) -> Group:
+def _parse_item(item: dict, idx: int, lib: ComponentLibrary, seed: str) -> tuple[str, Group]:
+    """解析一个 timeline 条目 → (iid, Group)。iid 与后续动画轨一一对应。"""
     if "component" in item:
         proto = item["component"]
         iid = item.get("iid", f"{proto}_{idx}")
@@ -117,11 +118,12 @@ def _parse_item(item: dict, idx: int, lib: ComponentLibrary, seed: str) -> Group
         t = _parse_transform(item.get("transform"))
         inst = Instance(proto, iid, overrides, t)
         try:
-            return lib.instantiate(inst, seed)
+            return iid, lib.instantiate(inst, seed)
         except (KeyError, ValueError) as e:
             raise DSLValidationError("timeline", f"items[{idx}]", str(e))
     if "primitive" in item:
-        return _parse_primitive(item, idx)
+        iid = item.get("iid", f"prim_{idx}")
+        return iid, _parse_primitive(item, idx)
     raise DSLValidationError("timeline", f"items[{idx}]", "缺少 component 或 primitive 字段")
 
 
@@ -178,10 +180,32 @@ def load_project(dir_path: str) -> Project:
         raise DSLValidationError("timeline.yaml", "<root>", "文件缺失")
     timeline = _load_yaml(timeline_f)
     _validate(TIMELINE_SCHEMA, timeline, "timeline.yaml")
-    groups: List[Group] = [
-        _parse_item(item, idx, lib, seed)
-        for idx, item in enumerate(timeline.get("items", []))
-    ]
+
+    from spolvero.animation.track import parse_anim
+
+    groups: List[Group] = []
+    iids: List[str] = []
+    anims: dict = {}
+    for idx, item in enumerate(timeline.get("items", [])):
+        iid, g = _parse_item(item, idx, lib, seed)
+        if iid in anims or iid in iids:
+            raise DSLValidationError(
+                "timeline", f"items[{idx}].iid", f"实例 id 重复: {iid!r}（动画轨按 iid 寻址，须唯一）"
+            )
+        iids.append(iid)
+        groups.append(g)
+        if item.get("anim"):
+            try:
+                anims[iid] = parse_anim(item["anim"])
+            except ValueError as e:
+                raise DSLValidationError("timeline", f"items[{idx}].anim", str(e))
+
+    duration = float(project.get("duration", 0.0) or 0.0)
+    if anims and duration <= 0.0:
+        raise DSLValidationError(
+            "project.yaml", "duration",
+            "timeline 含 anim 关键帧但 project.yaml 未给 duration（成片时长，秒）",
+        )
 
     return Project(
         seed=seed,
@@ -193,4 +217,7 @@ def load_project(dir_path: str) -> Project:
         groups=tuple(groups),
         palette=palette,
         src_dir=dir_path,
+        duration=duration,
+        iids=tuple(iids),
+        anims=anims,
     )

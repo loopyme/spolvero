@@ -3,12 +3,13 @@
 > Symbol Composition Animator — 矢量动画的确定性编译层
 > 本文件是 Spolvero 的权威工程规范。所有代码、DSL、CI、文档以本文件为基准。
 > 状态：可行性已 spike 验证（§14），M0–M3 已完成（25 项测试全绿），下一步 M4 三重校验。
+> M6 已拆分（M6a 预设资产 / M6b 转录器 / M6c 本地界面 / M6d Lottie），风格转录方案见 §7.2。
 
 ---
 
 ## 0. 与原始需求文档的关系
 
-原始《SymbolCompose Animator 项目官方需求文档》（用户与豆包对话产出）是**愿景与红线来源**。本 SPEC 是经可行性验证后的**落地约束**，对原始文档有 4 处修正（§2）与 3 条技术命门（§3），并补全了原始文档缺失的工程细节（确定性分级、Lottie 定位、AI 层闭环、API 实测结论）。
+原始《SymbolCompose Animator 项目官方需求文档》（用户与豆包对话产出）是**愿景与红线来源**。本 SPEC 是经可行性验证后的**落地约束**，对原始文档有 5 处修正（§2）与 3 条技术命门（§3），并补全了原始文档缺失的工程细节（确定性分级、Lottie 定位、AI 层闭环、API 实测结论、风格转录路径）。
 
 ---
 
@@ -21,7 +22,7 @@
 
 ---
 
-## 2. 对原始需求文档的 4 处修正（已决）
+## 2. 对原始需求文档的 5 处修正（已决）
 
 | # | 原文 | 问题 | 本 SPEC 决策 |
 |---|---|---|---|
@@ -29,10 +30,11 @@
 | 2 | 禁止 LLM 生成代码/SVG | 只说禁、没给替代闭环 | LLM 唯一输出契约＝**结构化 DSL/资产**；校验诊断结构化回灌 LLM 自纠（§11） |
 | 3 | 第八节音频 | 工作量被严重低估 | 首版只做时序轨 + 触发事件，出声后置 M9 |
 | 4 | 全局线条质感（干笔/飞白/毛涩） | 纯矢量画不出"墨" | 独立光栅笔刷模块（M7）；**实测 skia-python 未暴露 `PathEffect.MakeDiscrete/MakeDash`，须自研路径重采样+扰动实现**，非白送 |
+| 5 | AI 层四管线（剧本→分镜→构件→DSL） | 未界定 AI 的介入粒度与失败路径 | 风格转录中 AI **只介入一次**（仅产出 `tone.description` 与命名建议），提取主流程全走确定性 CV；无 API key / 断网时降级为规则模板，功能不得因此不可用 |
 
 ---
 
-## 3. 永久架构红线（原始 11 条 + 3 条技术命门 + 1 条派生约束）
+## 3. 永久架构红线（原始 11 条 + 3 条技术命门 + 3 条派生约束）
 
 **原始 11 条（绝对禁止）**
 1. 禁止新增引擎底层业务组件（只能用四大原语）
@@ -52,8 +54,10 @@
 - **命门 2 · 原型↔实例稀疏差分**：实例只存与原型默认值的差异，渲染时 `merge(原型默认, 实例override)`。全量快照会导致"改原型→全场景同步"永远做不对。
 - **命门 3 · ink_shape 控制点数恒定**：形变只在参数空间插值，不在点数上插值。
 
-**派生约束（spike 实测暴露，原始文档缺失）**
-- **布局坐标必须是 `(seed, instance_id)` 的纯函数**，绝不依赖数组顺序/索引。首版 A 测试用列表索引算网格坐标 → 插入实例后后续坐标全变（误报 FAIL），修正后漂移归零。真实引擎中实例自带 transform，场景图增删不打扰其他节点。
+**派生约束（原始文档缺失，已决）**
+- **布局坐标必须是 `(seed, instance_id)` 的纯函数**，绝不依赖数组顺序/索引。（spike 实测暴露）首版 A 测试用列表索引算网格坐标 → 插入实例后后续坐标全变（误报 FAIL），修正后漂移归零。真实引擎中实例自带 transform，场景图增删不打扰其他节点。
+- **UI 层零业务逻辑**。（本地自托管决策引入）`cli.py` 与 M6c 的 Flask 界面均只是 `api.py` 的薄调用方；造型、时序、转录逻辑一律不得出现在 UI 层。渲染与转录必须能在完全无 UI 的情况下独立运行——UI 内嵌业务逻辑等同破坏「离线渲染铁律」（§11）。
+- **转录产物 schema_version 化且冻结落盘**。（风格转录决策引入）风格转录器不在渲染路径上（创作期一次性），但其产物是唯一真相：`style.yaml` 必须带 `schema_version`，转录结果一经 `approve` 即冻结，禁止每次重跑重算——否则 palette 漂移会直接摧毁 L1 确定性（§9）。
 
 ---
 
@@ -71,9 +75,12 @@
 | `jsonschema` | `>=4.0` | DSL Schema 校验 | BUY |
 | `imageio-ffmpeg` | `>=0.5` | 提供静态 ffmpeg 二进制 | BUY |
 | `numpy` | `>=1.26`（可选） | 数值/批量；本内核暂不强制 | 评估中（确定性风险见 §9） |
-| `python-lottie` | `>=0.9`（M6 起） | Lottie 导入解析 | BUY（L1 导入用） |
+| `python-lottie` | `>=0.9`（M6d 起） | Lottie 导入解析 | BUY（L1 导入用） |
+| `flask` | `>=3.0`（M6c，可选） | 本地自托管界面（薄壳） | BUY；**声明为可选 extras `[ui]`**，内核与 CLI 不依赖 |
 
-**自研模块（不引库）**：派生 RNG、仿射变换、缓动曲线、SVG 后端、笔刷质感、CLI（stdlib `argparse`）。
+**自研模块（不引库）**：派生 RNG、仿射变换、缓动曲线、SVG 后端、笔刷质感、CLI（stdlib `argparse`）、**风格转录算法（中位切分色卡、8×6 密度直方图、结构张量笔触估计）**。
+
+**风格转录（M6b）不新增任何图像库**：参考画解码与确定性下采样复用已锁定的 `skia-python`（强制统一像素格式以规避跨平台 BGRA/RGBA 差异），不引 Pillow / OpenCV / numpy（numpy 的确定性风险见 §9）。
 
 ---
 
@@ -146,6 +153,86 @@ timeline.yaml   items: [ {component,iid,overrides,transform} | {primitive,iid,po
 - **裸原语模式**：`primitive: line|shape|dot` 直接声明四原语之一，`points/ring/pos` 为绝对坐标，可选 `color: #RRGGBB`。
 - **颜色支持（按用户要求就绪，主题场景后续接入）**：四原语均有可选 `color` 字段（`#RRGGBB`），渲染时优先于 `ink` 灰度（`render/common.color_of`）；首片仍为灰度，彩色主题经 `style.palette` 着色后续接入。架构已打通，无需改数据模型。
 
+> M6a 将对 `style.yaml` 做向后兼容扩展，并新增 `constraints.yaml`，见 §7.2。
+
+### 7.2 风格预设资产与转录器（M6a / M6b）
+
+**定位**：面向终端用户的本地功能——用户上传参考画，系统转录为**可复用的风格预设资产**。转录器是**编译器前端**（参考画＝源文件），不是风格迁移：不引入像素扩散模型（红线 4）、不复刻参考画构图（红线 3）、产物为数值参数而非像素。运行形态为本地自托管（`pip install` 后自行运行，无线上平台）。
+
+**style.yaml v1 扩展**（向后兼容，缺省字段走默认值）：
+
+```yaml
+schema_version: 1               # 必备；产物冻结的唯一标识
+id: <slug>
+name: <用户可改>
+description: <AI 或规则模板产出>
+default_ink: 0.30
+grayscale: false
+fidelity_default: 0.0           # 0=仅取调性；1=强贴合参考构图
+sources:                        # 多图合成：角色分层
+  - {sha256: <原图哈希>, role: color|composition|texture|all, weight: 1.0}
+tone:
+  palette: {paper: "#RRGGBB", base: "#RRGGBB", ink: "#RRGGBB"}
+  accents: ["#RRGGBB", ...]     # 0–3 个；纯水墨/素描可为空
+  purity_axis: 0.0              # 0–1，点缀色纯度轴
+composition:                    # 核心 4 约束 + 扩展 2 指纹
+  whiteness: 0.0                # 留白率
+  color_area: 0.0               # 彩面积占比
+  density_profile: []           # 8×6 归一化覆盖率直方图
+  clustering: 0.0               # 堆积度（局部聚集指数）
+  region_count: 0               # 扩展 2：色块/连通域数（平涂类风格关键特征）
+  centroid: [0.5, 0.5]          # 扩展 2：墨质心 (cx, cy)
+  axis_deg: 0.0                 # 主轴角度（二阶矩）
+texture:
+  stroke_coherence: 0.0         # 结构张量方向场相干度
+  grain: 0.0                    # 颗粒度
+  edge_hardness: 0.0            # 边缘硬度
+```
+
+**constraints.yaml**（M6a 起独立落地，便于单独 diff）：渲染后实测留白 / 彩面 / 密度 / 堆积，超出配置区间出 `warning` 而非阻断——承接 §2 修正 1 的分级原则。
+
+**转录三层**（全部确定性，不引 Pillow / OpenCV / numpy）：
+
+| 层 | 算法 | 输出 |
+|---|---|---|
+| 色彩 | 固定位深直方图 + **中位切分**（**禁用 k-means**：随机初始化破坏确定性）；**彩度分支**（近灰图改走明度分层，`accents` 为空）；**面积 × 纯度双轴**分类 | `palette` / `accents` / `purity_axis` |
+| 构图 | 8×6 网格覆盖率直方图 + 连通域聚集指数 + 质心 + 二阶矩主轴 | 核心 4 + 扩展 2 |
+| 质感 | **结构张量**方向场 → 相干度 / 颗粒 / 边缘硬度 | 交 M7 光栅笔刷模块 |
+
+阈值（`T_paper` / `T_sat`）必须**自适应**（分位数或 Otsu），不得写死，否则亮调画与暗调画各崩一边。
+
+**可表达性三档 + 自动降档**（是降档，不是拒绝）：
+
+| 档 | 参考画类型 | 策略 |
+|---|---|---|
+| A | 天生符号化：吴冠中 / 八大山人 / 浮世绘 / 敦煌 / 剪纸 / 构成主义 | 直接转录，几乎无损 |
+| B | 结构化但有连续调：印象派 / 马蒂斯 / 梵高 | 先色阶量化（posterize 至 5–7 阶）再转录，损失可控 |
+| C | 写实 / 渐变为主：古典油画 / 摄影 / 3D 渲染图 | 强制抽象化，界面明示「非复制」——承接红线 5 |
+
+判定量两个标量即可（均确定性）：**高频细节能量**（结构张量响应方差）与**连续色调占比**（直方图局部平滑度）。
+
+**多图合成语义**：默认**分层选取**（色层取 A、构图取 B、质感取 C）。同层多图时：`accents` 取**并集去重后按面积排序取 top 3**，`density_profile` 按权重加权平均，标量按权重插值。**禁止同层 palette 做色相插值**——色相插值会产出「谁都不是」的脏色。
+
+**UI 边界**（落地 §3 派生约束）：`api.py` 是唯一稳定边界，`cli.py` 与 M6c 的 Flask 界面均为薄调用方。
+
+```python
+transcribe_style(sources, *, name=None, ai=True) -> StyleAsset
+compose_styles(parts, *, name=None) -> StyleAsset        # 多图合成
+render_preview(asset, knobs, size=(720, 480)) -> str     # 返回 SVG，供滑杆实时重渲染
+save_style(asset) -> Path
+list_styles() -> list[StyleAsset]
+```
+
+`render_preview` 返回 **SVG 字符串**是刻意选择：引擎天然矢量，界面滑杆改动后直接替换 DOM 即可，无需落盘、无状态、且天然确定性。
+
+**CLI**：`spol style from-image <ref...> [--role color|composition|texture|all] [--no-ai]`、`spol style merge`、`spol style preview`、`spol style list`。
+
+**AI 介入粒度**（§2 修正 5）：全程仅一次调用，产出 `description` 与命名建议；`--no-ai` 或无 API key 时降级为规则模板命名，功能不得因此不可用。响应按 sha 缓存（§11）。
+
+**预设缩略图必须由引擎自渲染**（`styles/<id>/preview.png`），不得使用参考画原图——保证本地资产可自由传递，且顺带是最好的功能演示。
+
+**确定性**：转录器在渲染路径之外（创作期一次性），自身不受 L1 约束；但产物一经 `approve` 即冻结落盘为唯一真相（§3 派生约束）。
+
 ---
 
 ## 8. 三重自动校验体系
@@ -195,8 +282,8 @@ timeline.yaml   items: [ {component,iid,overrides,transform} | {primitive,iid,po
 
 | 档位 | 内容 | 决策 | 实现 |
 |---|---|---|---|
-| L0 导出 | DSL → Lottie / dotLottie JSON（烘焙结果，丢参数化） | 做（M6） | 自研 DSL→Lottie 序列化 |
-| L1 导入 | Lottie / SVG → 构件原型 | 做（M6） | **python-lottie 解析 → shapely 几何化 → 控制点归一化 → 四原语**（Skia Skottie 未暴露，非走 Skia） |
+| L0 导出 | DSL → Lottie / dotLottie JSON（烘焙结果，丢参数化） | 做（M6d） | 自研 DSL→Lottie 序列化 |
+| L1 导入 | Lottie / SVG → 构件原型 | 做（M6d） | **python-lottie 解析 → shapely 几何化 → 控制点归一化 → 四原语**（Skia Skottie 未暴露，非走 Skia） |
 | L2 内核对齐 | Lottie 数据模型作内部表示 | **不做（致命）** | Lottie 装不下原型/实例/seed/随机；JSON 冗长到模型喂不下 |
 
 导出同时支持 Lottie 与 dotLottie，不押注单一；保留 SVG 输出（设计交付更友好，引擎天然矢量）。
@@ -213,13 +300,16 @@ timeline.yaml   items: [ {component,iid,overrides,transform} | {primitive,iid,po
 | M3 ✅ | DSL：Schema、解析器、工程层/时序层、裸原语模式、错误定位 | 合法/非法 DSL 各跑通（见 §14.2） |
 | M4 | 三重校验：语法/几何/艺术相似度 + 结构化诊断 | 故意造相似形体被拦 |
 | M5 | 时序动画、缓动、group 变换、帧序列、ffmpeg 合成、快照(含哈希) | 单镜头 4 秒可循环成片 |
-| M6 | 风格预设插件、两套官方风格、留白/彩面积/密度/堆积四约束、Lottie L0/L1 | 官方示例片达标 |
+| M6a | 预设资产与渲染接入：`style.yaml` v1 扩展、`constraints.yaml`、核心 4 + 扩展 2 约束在渲染器生效、`color_of` 接入 palette、两套官方**手写**预设、**定死 `api.py` 边界** | 官方预设 golden 哈希锁定；约束实测值落入配置区间 |
+| M6b | 风格转录器：三层确定性提取、三档可表达性降档、多图合成、sidecar 证据、AI 单次命名（可降级）、CLI | 同图两次转录 sidecar 逐字段一致；A/B/C 三档命中；极端图（全黑/全白/单色/1×1）不崩且不产出空 palette |
+| M6c | 本地 Flask 薄壳（可选 extras `[ui]`）：上传 → 风格卡片 → 滑杆 → SVG 实时预览 → 存预设 | 滑杆拖动下预览确定性；无 AI key 可用 |
+| M6d | Lottie 对接 L0 导出 / L1 导入（原 M6 后半，彻底独立） | 导出可被 Lottie 播放器加载 |
 | M7 | 光栅笔刷渲染器（干笔/飞白/毛涩，自研路径重采样+扰动） | 质感对比图 |
 | M8 | 静态构图预览、甘特图、插值曲线可视化 | 预览面板 |
 | M9 | 双轨音频、混音限幅、音画联动 | 带声成片 |
 | M10 | AI 适配器：四段 prompt + 自纠回灌 + sha 缓存 + 审核闸门 | 全 AI 驱动成片 |
 
-M1→M5 为最小垂直切片，先出一条成片再横向扩。
+M1→M5 为最小垂直切片，先出一条成片再横向扩。M6a 先做**手写**官方预设，为 M6b 提供 schema 对标基线——转录产物必须能落进同一套 schema，否则说明抽象错了；M6c 依赖 M6b，M6d 可与其他并行。
 
 ---
 
@@ -276,7 +366,8 @@ CLI：`spol render --project projects/lonely_boat --backend skia --out out.png` 
 ## 15. 库使用纪律（build vs buy 评估，强制）
 
 - 调用任何第三方库前，**先读其 API 文档/内省实际接口**，禁止盲目 trial-and-error。
-- 已决评估（详见 §4 表）：RNG/仿射/缓动/SVG/笔刷/CLI 自研；skia/shapely/pyyaml/jsonschema/imageio-ffmpeg/python-lottie BUY。
+- 已决评估（详见 §4 表）：RNG/仿射/缓动/SVG/笔刷/CLI 自研；skia/shapely/pyyaml/jsonschema/imageio-ffmpeg/python-lottie/flask BUY。
+- 风格转录（M6b）同理：**BUY Skia 做解码与下采样，BUILD 色卡/构图/质感算法**——不因「要做图像处理」就顺手引入 Pillow/OpenCV。
 - 笔刷质感（M7）定位变更：**BUY Skia 做光栅，BUILD 笔刷纹理**（skia-python 未暴露 MakeDiscrete/Dash）。
 - Skottie 未暴露 → L1 导入走 python-lottie，不走 Skia。
 
@@ -308,8 +399,19 @@ Spolvero/
 │   │   ├── svg.py          # 零依赖 SVG 后端
 │   │   └── skia.py         # Skia png 后端
 │   ├── dsl/                # M3：model / schema / parser（声明式工程资产 → 场景图）
-│   └── ...
+│   ├── api.py              # M6a：稳定函数边界（CLI 与 Flask 共用；UI 零业务逻辑）
+│   ├── transcribe/         # M6b：转录器包
+│   │   ├── image.py        #    解码 → 固定像素格式 → 确定性最近邻下采样
+│   │   ├── color.py        #    中位切分 / 彩度分支 / 面积×纯度双轴 / accents
+│   │   ├── compose.py      #    留白·彩面·密度 8×6·堆积·色块数·质心·主轴
+│   │   ├── texture.py      #    结构张量 → 相干度 / 颗粒 / 边缘硬度
+│   │   ├── guard.py        #    可表达性三档判定 + 降档建议
+│   │   ├── merge.py        #    多图合成：分层选取 + 同层合并
+│   │   ├── naming.py       #    AI 单次调用 + 规则模板降级
+│   │   └── evidence.py     #    sidecar 证据落盘
+│   └── ui/                 # M6c（可选 extras [ui]）：Flask 薄壳，仅调用 api.py
 ├── projects/               # 工程资产（声明式）：lonely_boat/{project,style,components,timeline}.yaml
+├── styles/                 # M6a：可复用风格预设资产 <id>/{style.yaml,constraints.yaml,preview.png}
 ├── examples/               # 示例片与接触表
 ├── tests/
 └── .github/workflows/ci.yml   # ubuntu + macos，golden-frame hash

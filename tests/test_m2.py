@@ -24,8 +24,8 @@ from spolvero.scenes import LONELY_BOAT_SEED, lonely_boat_scene
 SEED = "spolvero-m2-test"
 
 # golden 帧哈希（L1 同机同版本 byte-identical，CI 卡死）
-GOLDEN_LONELY_PNG = "a4fda813dc9f9a4bd0fff9916c606521a4e1c0c5eb86be09f69ff6c70ac90771"
-GOLDEN_LONELY_SVG = "773b962a6b994820a2805bca1b4622b08b2c16003fc522dfeffffa895c01fb7d"
+GOLDEN_LONELY_PNG = "64de3c735259ea26abdee21a7b8ba3f3cc02f82b68803b02a2ec1565bed9e589"
+GOLDEN_LONELY_SVG = "ab6f822f59fde43e376a612a947f40dc6090e584819bc5fb45268efea44eabef"
 
 
 def _hull_of(group: Group) -> InkShape:
@@ -134,7 +134,7 @@ def test_control_point_count_constant():
             assert len(child.points) == 16
     for i in range(20):
         m = lib.instantiate(Instance("mountain", f"m_{i:03d}"), SEED)
-        ring = m.children[0].ring  # 山脊 7 + 基线 2
+        ring = m.children[0].ring  # 山脊恒定 9 点（首末点钉在基线）
         assert len(ring) == 9
 
 

@@ -21,8 +21,8 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PROJECT = os.path.join(ROOT, "projects", "lonely_boat")
 
 # DSL 工程 golden 哈希（L1 byte-identical 门禁，与 M2 demo 同源）
-GOLDEN_PNG = "a4fda813dc9f9a4bd0fff9916c606521a4e1c0c5eb86be09f69ff6c70ac90771"
-GOLDEN_SVG = "773b962a6b994820a2805bca1b4622b08b2c16003fc522dfeffffa895c01fb7d"
+GOLDEN_PNG = "64de3c735259ea26abdee21a7b8ba3f3cc02f82b68803b02a2ec1565bed9e589"
+GOLDEN_SVG = "ab6f822f59fde43e376a612a947f40dc6090e584819bc5fb45268efea44eabef"
 
 
 def _render(project, backend):

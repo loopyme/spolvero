@@ -118,7 +118,11 @@ def _build_mountain(params: dict, seed: str, iid: str) -> Group:
     H = params["height"]
     jag = params["jag"]
     ink = params["ink"]
-    N = 7  # 山脊控制点（恒定）
+    # 恒定 9 点（命门 3）：山脊 x 自 -0.5W 严格单调到 +0.5W。
+    # 首末点钉在基线 y=0 作闭合锚点；中间点一律钳制在基线上方（y ≤ -0.5）。
+    # 「x 单调 + 全部中间顶点位于闭合边同侧」→ 必为简单多边形（shapely is_valid），
+    # 旧实现追加重合基线点 / 抖动下潜会破坏该性质，被 M4 校验器捕获。
+    N = 9
     p1 = 0.30 + derive(seed, iid, "m1") * 0.25
     p2 = 0.60 + derive(seed, iid, "m2") * 0.25
     a1 = 0.6 + derive(seed, iid, "a1") * 0.4
@@ -127,12 +131,13 @@ def _build_mountain(params: dict, seed: str, iid: str) -> Group:
     for k in range(N):
         t = k / (N - 1)
         x = (t - 0.5) * W
-        y = -(a1 * H * _bump(t, p1, 0.18) + a2 * H * _bump(t, p2, 0.15))
-        y -= (derive(seed, iid, f"mj{k}") - 0.5) * jag * H * 0.18
+        if k == 0 or k == N - 1:
+            y = 0.0
+        else:
+            y = -(a1 * H * _bump(t, p1, 0.18) + a2 * H * _bump(t, p2, 0.15))
+            y -= (derive(seed, iid, f"mj{k}") - 0.5) * jag * H * 0.18
+            y = min(y, -0.5)
         pts.append(Point(x, y))
-    # 恒定 9 点：山脊 7 + 基线两端 2，构成闭合浅灰剪影
-    pts.append(Point(0.5 * W, 0.0))
-    pts.append(Point(-0.5 * W, 0.0))
     return Group((InkShape(ring=tuple(pts), ink=ink, fill=True),), Transform.identity())
 
 

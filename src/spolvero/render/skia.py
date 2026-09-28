@@ -60,3 +60,20 @@ def render_png(leaves: Sequence, width: int, height: int, bg: Bg) -> bytes:
 
     img = surface.makeImageSnapshot()
     return bytes(img.encodeToData())
+
+
+def png_to_rgb(png: bytes) -> bytes:
+    """PNG 字节 → 紧凑 RGB24 原始字节（H.264 编码输入）。
+
+    从「已哈希的规范 PNG」解码，保证视频像素与帧哈希所对应的画面严格同源；
+    解码出的图像在本机为 BGRA_8888，据 colorType 显式换序，不依赖平台默认。
+    """
+    img = skia.Image.MakeFromEncoded(png)
+    if img is None:
+        raise ValueError("PNG 解码失败")
+    arr = img.toarray()  # (h, w, 4) uint8
+    if img.colorType() == skia.kBGRA_8888_ColorType:
+        arr = arr[:, :, [2, 1, 0]]
+    else:
+        arr = arr[:, :, :3]
+    return arr.tobytes()

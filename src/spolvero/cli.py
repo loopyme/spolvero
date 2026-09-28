@@ -110,9 +110,29 @@ def _cmd_render(args: argparse.Namespace) -> int:
     return 0
 
 
-def _cmd_check(_args: argparse.Namespace) -> int:
-    print("check: (stub) 三重校验待 M4 实现")
-    return 0
+def _cmd_check(args: argparse.Namespace) -> int:
+    """三重校验（M4）：几何拓扑 / 艺术相似度 / 构图四约束。
+
+    退出码：0 通过（允许含 warning）；1 存在 error（阻断渲染）；2 DSL 非法。
+    --json 输出结构化 Issue 列表，供 AI 自纠闭环回灌（SPEC §8 / §11）。
+    """
+    import json
+
+    from spolvero.dsl.parser import DSLValidationError, load_project
+    from spolvero.validation.validator import validate_project
+
+    try:
+        proj = load_project(args.project)
+    except DSLValidationError as e:
+        print(f"DSL 校验失败：{e}")
+        return 2
+
+    report = validate_project(proj)
+    if args.json:
+        print(json.dumps([i.to_dict() for i in report.issues], ensure_ascii=False, indent=2))
+    else:
+        print(report.render_text())
+    return 0 if report.passed else 1
 
 
 def _cmd_snapshot(_args: argparse.Namespace) -> int:
@@ -146,8 +166,11 @@ def build_parser() -> argparse.ArgumentParser:
     pr.add_argument("--backend", default="skia", choices=["svg", "skia"])
     pr.add_argument("--out", default=None, help="输出文件路径（.svg/.png）")
 
-    for name in ("check", "snapshot"):
-        sub.add_parser(name)
+    pc = sub.add_parser("check", help="三重校验（几何/相似度/构图）")
+    pc.add_argument("--project", required=True, help="工程目录")
+    pc.add_argument("--json", action="store_true", help="输出结构化 Issue JSON（供自纠回灌）")
+
+    sub.add_parser("snapshot")
 
     return p
 

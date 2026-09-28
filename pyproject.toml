@@ -14,6 +14,7 @@ keywords = ["animation", "vector", "symbolic", "deterministic", "composition"]
 dependencies = [
     "skia-python==144.0.post2",
     "shapely>=2.0",
+    "numpy>=1.26",
     "pyyaml>=6.0",
     "jsonschema>=4.0",
     "imageio-ffmpeg>=0.5",

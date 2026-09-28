@@ -15,6 +15,7 @@ PROJECT_SCHEMA = {
         "width": {"type": "integer", "minimum": 1, "maximum": 8192},
         "height": {"type": "integer", "minimum": 1, "maximum": 8192},
         "fps": {"type": "integer", "minimum": 1, "maximum": 120},
+        "duration": {"type": "number", "minimum": 0.0, "maximum": 600.0},
         "style": {"type": "string"},
         "background": {"type": "string", "pattern": HEX},
     },
@@ -75,6 +76,39 @@ _TRANSFORM_SCHEMA = {
     },
 }
 
+_ANIM_CHANNEL_SCHEMA = {
+    "type": "object",
+    "required": ["channel", "keys"],
+    "additionalProperties": False,
+    "properties": {
+        "channel": {"type": "string", "enum": ["translate", "rotate", "scale", "ink_shift"]},
+        "ease": {"type": "string", "enum": ["linear", "smooth", "in", "out"]},
+        "keys": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+                "type": "object",
+                "required": ["t", "v"],
+                "additionalProperties": False,
+                "properties": {
+                    "t": {"type": "number"},
+                    "v": {
+                        "oneOf": [
+                            {"type": "number"},
+                            {
+                                "type": "array",
+                                "items": {"type": "number"},
+                                "minItems": 2,
+                                "maxItems": 2,
+                            },
+                        ]
+                    },
+                },
+            },
+        },
+    },
+}
+
 _TIMELINE_ITEM_SCHEMA = {
     "type": "object",
     "properties": {
@@ -83,6 +117,7 @@ _TIMELINE_ITEM_SCHEMA = {
         "iid": {"type": "string"},
         "overrides": {"type": "object"},
         "transform": _TRANSFORM_SCHEMA,
+        "anim": {"type": "array", "items": _ANIM_CHANNEL_SCHEMA},
         "points": {"type": "array"},
         "ring": {"type": "array"},
         "pos": {"type": "array", "items": {"type": "number"}, "minItems": 2, "maxItems": 2},

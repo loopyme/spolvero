@@ -23,6 +23,14 @@ class Project:
     groups: Tuple[Group, ...]
     palette: dict = field(default_factory=dict)
     src_dir: str = ""
+    # —— M5 时序层 ——
+    duration: float = 0.0  # 成片时长（秒）；0 表示静态工程
+    iids: Tuple[str, ...] = ()  # 与 groups 一一对应的实例 id
+    anims: dict = field(default_factory=dict)  # iid -> AnimSet
 
     def scene(self) -> list[Group]:
         return list(self.groups)
+
+    @property
+    def is_animated(self) -> bool:
+        return bool(self.anims) and self.duration > 0.0
