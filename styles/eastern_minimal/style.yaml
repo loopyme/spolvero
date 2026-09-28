@@ -1,0 +1,29 @@
+schema_version: 1
+id: eastern_minimal
+name: 东方极简
+description: 水墨符号构成：以大量留白为主，线条克制、远山浅墨、焦点元素深墨。全片灰度（grayscale=true），不允许出现任何彩色元素。
+default_ink: 0.3
+grayscale: true
+fidelity_default: 0.0
+sources: []
+tone:
+  palette:
+    paper: '#F7F5F0'
+    base: '#6E6A64'
+    ink: '#1A1A1A'
+  accents: []
+  purity_axis: 0.0
+composition:
+  whiteness: 0.92
+  color_area: 0.0
+  density_profile: []
+  clustering: 0.32
+  region_count: 5
+  centroid:
+  - 0.45
+  - 0.58
+  axis_deg: -17.6
+texture:
+  stroke_coherence: 0.0
+  grain: 0.0
+  edge_hardness: 1.0

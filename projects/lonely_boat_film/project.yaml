@@ -1,0 +1,10 @@
+# 「孤舟渡江」官方示例片（M6 交付）——4 秒无缝循环
+# 与 projects/lonely_boat 同 seed / 同构图，差别仅在于时序层与时长。
+# fps×duration = 24×4.0 = 96 帧；所有动画首末关键帧同值 → 满环可无缝循环。
+seed: spolvero-lonely-boat-v1
+width: 1600
+height: 900
+fps: 24
+duration: 4.0
+style: eastern_minimal
+background: "#F7F5F0"

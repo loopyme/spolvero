@@ -2,7 +2,9 @@
 
 > Symbol Composition Animator — 矢量动画的确定性编译层
 > 本文件是 Spolvero 的权威工程规范。所有代码、DSL、CI、文档以本文件为基准。
-> 状态：可行性已 spike 验证（§14），M0–M3 已完成（25 项测试全绿），下一步 M4 三重校验。
+> 状态：可行性已 spike 验证（§14），**M0–M5 与 M6a／M6d 已完成（110 项测试全绿）**，
+> 官方示例片 `examples/lonely_boat_film.mp4` 已产出（4s 无缝循环、96/96 帧互异）。
+> 下一步 M6b 风格转录器（签名已在 `api.py` 定死）、M6c 本地界面。
 > M6 已拆分（M6a 预设资产 / M6b 转录器 / M6c 本地界面 / M6d Lottie），风格转录方案见 §7.2。
 
 ---
@@ -298,12 +300,12 @@ list_styles() -> list[StyleAsset]
 | M1 ✅ | 四原语数据模型、路径求值、仿射、派生 RNG、SVG+Skia 双后端 | 手写原语可出图、确定性通过 |
 | M2 ✅ | 构件系统：原型、值域校验、原语展开、实例稀疏 override、L1/L2 差异化 | 一原型出 50 差异化实例（见 §14.1） |
 | M3 ✅ | DSL：Schema、解析器、工程层/时序层、裸原语模式、错误定位 | 合法/非法 DSL 各跑通（见 §14.2） |
-| M4 | 三重校验：语法/几何/艺术相似度 + 结构化诊断 | 故意造相似形体被拦 |
-| M5 | 时序动画、缓动、group 变换、帧序列、ffmpeg 合成、快照(含哈希) | 单镜头 4 秒可循环成片 |
-| M6a | 预设资产与渲染接入：`style.yaml` v1 扩展、`constraints.yaml`、核心 4 + 扩展 2 约束在渲染器生效、`color_of` 接入 palette、两套官方**手写**预设、**定死 `api.py` 边界** | 官方预设 golden 哈希锁定；约束实测值落入配置区间 |
+| M4 ✅ | 三重校验：语法/几何/艺术相似度 + 结构化诊断 | 故意造相似形体被拦（见 §14.3） |
+| M5 ✅ | 时序动画、缓动、group 变换、帧序列、ffmpeg 合成、快照(含哈希) | 单镜头 4 秒可循环成片（见 §14.4） |
+| M6a ✅ | 预设资产与渲染接入：`style.yaml` v1 扩展、`constraints.yaml`、核心 4 + 扩展 2 约束在渲染器生效、`color_of` 接入 palette、两套官方**手写**预设、**定死 `api.py` 边界** | 官方预设 golden 哈希锁定；约束实测值落入配置区间（见 §14.5） |
 | M6b | 风格转录器：三层确定性提取、三档可表达性降档、多图合成、sidecar 证据、AI 单次命名（可降级）、CLI | 同图两次转录 sidecar 逐字段一致；A/B/C 三档命中；极端图（全黑/全白/单色/1×1）不崩且不产出空 palette |
 | M6c | 本地 Flask 薄壳（可选 extras `[ui]`）：上传 → 风格卡片 → 滑杆 → SVG 实时预览 → 存预设 | 滑杆拖动下预览确定性；无 AI key 可用 |
-| M6d | Lottie 对接 L0 导出 / L1 导入（原 M6 后半，彻底独立） | 导出可被 Lottie 播放器加载 |
+| M6d ✅ | Lottie 对接 L0 导出 / L1 导入（原 M6 后半，彻底独立） | 导出可被 Lottie 播放器加载（见 §14.5） |
 | M7 | 光栅笔刷渲染器（干笔/飞白/毛涩，自研路径重采样+扰动） | 质感对比图 |
 | M8 | 静态构图预览、甘特图、插值曲线可视化 | 预览面板 |
 | M9 | 双轨音频、混音限幅、音画联动 | 带声成片 |
@@ -361,6 +363,57 @@ M1→M5 为最小垂直切片，先出一条成片再横向扩。M6a 先做**手
 
 CLI：`spol render --project projects/lonely_boat --backend skia --out out.png` 已通；`spol init <dir>` 脚手架已就绪。
 
+## 14.3 M4 三重校验证据（已通过，`tests/test_m4.py` 22 项全绿）
+
+| 检验项 | 结果 | 硬证据 |
+|---|---|---|
+| 几何拓扑 | ✅ | 蝴蝶结自相交 → `GEOM_SELF_INTERSECT`(error)；顶点<3 → error；重复点 → warning 放行；合法方形零误报 |
+| 相似度真阳性 | ✅ | 两个近重合方形 → `ART_NEAR_DUPLICATE`（相对距离 0.0183 < 0.06） |
+| 相似度尺度自适应 | ✅ | 250px 远山 vs 132px 船体：绝对距离仅 0.0258，**相对**距离 0.33 → 不误报（见下方设计修正） |
+| 空间门限 | ✅ | 远处同形重复（≥0.25 对角线）豁免，避免误伤「三重远山」母题 |
+| 构图四约束 | ✅ | 满覆盖长方形 → `COMP_LOW_WHITESPACE`；着色叶节点在灰度风格下 → `COMP_COLOR_AREA`；`as_error` 可升级为阻断 |
+| 真实缺陷捕获 | ✅ | 校验器抓出远山构建器的退化边（抖动使顶点下潜到闭合边另一侧 → shapely 判自相交），已修（首末钉基线 + 中间点钳制） |
+
+**设计修正记录（重要）**：第二重相似度最初用「绝对签名距离」，在元素变小后绝对距离整体变小，导致 250px 远山与 132px 船体几乎任何差异都 < 阈值而误报。改为 **尺度自适应相对距离**（绝对距离 ÷ 较大一方的 RMS 幅值）后，阈值语义变成「形状差异占自身尺度的比例」，与元素大小解耦。另：开放笔画（水纹/云纹一类**有意重复母题**）默认不参与比较，否则同组 16 点正弦线会互相误报；需严格模式时 `include_lines=True`。
+
+## 14.4 M5 时序动画证据（已通过，`tests/test_m5.py` 23 项全绿）
+
+| 检验项 | 结果 | 硬证据 |
+|---|---|---|
+| 缓动确定性 | ✅ | 4 种缓动端点严格 0/1、单调；纯多项式无 libm |
+| 关键帧轨 | ✅ | 维度/升序校验报错；区间外 hold；线性中点精确 50.0 |
+| 变换增量 | ✅ | 绕世界锚点旋转时锚点自身不动；180° 后半径 10px 处误差 < 1e-3 |
+| 帧序无关 | ✅ | 正序/逆序求值结果一致（可跳帧渲染） |
+| 满环闭合 | ✅ | 首末键同值 → `scene_at(0) == scene_at(duration)` 严格相等 |
+| 成片 | ✅ | 6 帧 mp4 产出、`ftyp/moov` 封装正确、宽高奇数时报错 |
+| 快照 | ✅ | manifest 中每个 sha256 与落盘 PNG 实际哈希一致 |
+| DSL 接入 | ✅ | anim 解析；缺 duration / iid 重复 / 非法通道均结构化定位报错 |
+
+**顺带修复的真实缺陷（关键）**：`core/dmath` 的 Taylor 级数直接作用在归约到 [-π, π] 的角上，`cos(π)` 误差达 **~2.4e-2**（-0.976 而非 -1），180° 旋转会出现可见的尺寸偏差——动画旋转通道一上就暴露。改为「归约 → 象限折叠 → |x| ≤ π/4 小角核函数」后，全定义域误差 ≤ **1.15e-10**，`dcos(π) == -1.0` 精确成立。
+
+## 14.5 M6a 风格预设 + M6d Lottie 证据（已通过，`tests/test_m6.py` 28 + `test_m6_film.py` 12 项全绿）
+
+官方示例片产物：`examples/lonely_boat_film.{mp4,png,svg,json}`、
+`examples/lonely_boat_film_manifest.json`、`examples/film_snapshots/`。
+
+| 检验项 | 结果 | 硬证据 |
+|---|---|---|
+| 灰度预设恒等 | ✅ | `eastern_minimal` 渲染结果与 M3 golden **逐字节相同**（`64de3c73…`）——着色层不改动既有确定性 |
+| 彩色预设确定性 | ✅ | `vermilion` 两次渲染逐字节一致；底色换为预设纸色 `#F6F1E7` |
+| 三档映射 | ✅ | ink=1→paper、ink=BASE_BREAK→base、ink=0→ink，精度单调 |
+| 点染规则 | ✅ | 仅小半径低墨墨点取 `accents[0]`（实测 10px 朱红），月亮/深墨点不误取 |
+| 约束接入 | ✅ | 工程在 `eastern_minimal` 下 0 error / 0 warning；把灯染红则 `COMP_COLOR_AREA` 触发 |
+| 扩展 2 指纹 | ✅ | 色块数/质心/主轴可重复；8×6 覆盖率直方图长度 48 |
+| 预览 | ✅ | `render_preview` 返回 SVG 字符串、确定性、滑杆参数不改原资产；缩略图 720×480 引擎自渲染 |
+| 资产 I/O | ✅ | 落盘/回读逐字段相等；`schema_version` 不匹配拒绝落盘；`styles/<id>/` 与内置预设**防漂移测试**守护 |
+| Lottie L0 | ✅ | 10 层、可被 python-lottie 解析、两次导出字节一致；动画层逐帧烘焙为 96 个 hold 关键帧 |
+| Lottie L1 | ✅ | 回读 22 叶节点，**全部控制点归一化为 24**（命门 3）；几何尺度保持；gzip/tgs 亦可导入 |
+| 成片验收 | ✅ | 96 帧 @24fps 1600×900 H.264(yuv420p) 4.000s；**96/96 帧互异**；满环闭合；校验 0 error |
+
+**两处设计修正（重要）**：
+1. `color_area` 不能按「有 color 字段的叶节点占比」统计——彩色风格下所有叶节点都会带 color，比值恒为 1，约束失去意义。改为**按色度判定**（RGB 通道极差 > 60 才算彩色；朱砂墨色是暖调，极差仅 17–50，属「墨」不属于「彩」）。
+2. 中间关键帧若取正中对称（t=2），smooth 缓动会使 t 与 4-t 姿态完全相同，96 帧只剩 49 个不同画面（运动变成「出去再原路回来」）。改为**不等距中间键**后 96/96 帧互异，运动成为单向缓流，循环仍无缝。
+
 ---
 
 ## 15. 库使用纪律（build vs buy 评估，强制）
@@ -377,19 +430,21 @@ CLI：`spol render --project projects/lonely_boat --backend skia --out out.png` 
 
 ```
 Spolvero/
-├── pyproject.toml
+├── pyproject.toml          # 依赖锁版本；extras: [lottie] / [ui] / [dev]
 ├── SPEC.md
 ├── README.md
 ├── src/spolvero/
 │   ├── __init__.py
 │   ├── __main__.py
-│   ├── cli.py
+│   ├── cli.py              # 薄壳：只解析参数并调用 api.py（UI 零业务逻辑）
+│   ├── api.py              # 唯一稳定函数边界（CLI 与 Flask 共用；M6b 签名已定死）
 │   ├── core/
 │   │   ├── rng.py          # 派生式 RNG
-│   │   ├── dmath.py        # 确定性 cos/sin（不碰 libm）
+│   │   ├── dmath.py        # 确定性 cos/sin（归约+象限折叠+小角核，误差 ≤1.15e-10）
 │   │   ├── primitives.py   # 四原语 frozen 数据类（各含可选 color:#RRGGBB）
 │   │   ├── transform.py    # 仿射变换
 │   │   ├── component.py    # 构件体系：ParamSpec/Prototype/Instance/Library + PATTERN_REGISTRY
+│   │   ├── scene.py        # 场景图拍平（局部 → 世界坐标）
 │   │   └── types.py        # Point 等
 │   ├── components/         # 构件库（可复用原型 + 内置构建模式）：lonely_boat.py
 │   ├── scenes/             # 场景构图（本片实例）：lonely_boat.py
@@ -397,22 +452,23 @@ Spolvero/
 │   │   ├── backend.py      # 后端分发
 │   │   ├── common.py       # gray_of / color_of（灰度与彩色统一入口）
 │   │   ├── svg.py          # 零依赖 SVG 后端
-│   │   └── skia.py         # Skia png 后端
+│   │   └── skia.py         # Skia png 后端 + png_to_rgb（H.264 输入）
 │   ├── dsl/                # M3：model / schema / parser（声明式工程资产 → 场景图）
-│   ├── api.py              # M6a：稳定函数边界（CLI 与 Flask 共用；UI 零业务逻辑）
-│   ├── transcribe/         # M6b：转录器包
-│   │   ├── image.py        #    解码 → 固定像素格式 → 确定性最近邻下采样
-│   │   ├── color.py        #    中位切分 / 彩度分支 / 面积×纯度双轴 / accents
-│   │   ├── compose.py      #    留白·彩面·密度 8×6·堆积·色块数·质心·主轴
-│   │   ├── texture.py      #    结构张量 → 相干度 / 颗粒 / 边缘硬度
-│   │   ├── guard.py        #    可表达性三档判定 + 降档建议
-│   │   ├── merge.py        #    多图合成：分层选取 + 同层合并
-│   │   ├── naming.py       #    AI 单次调用 + 规则模板降级
-│   │   └── evidence.py     #    sidecar 证据落盘
+│   ├── validation/         # M4：diagnostics / geometry / similarity / composition / validator
+│   ├── animation/          # M5：easing / track / film（逐帧求值、mp4、快照）
+│   ├── styles/             # M6a：asset / apply / presets / preview / io
+│   ├── lottie/             # M6d：export(L0 烘焙) / importer(L1 归一化)
+│   ├── transcribe/         # M6b：转录器包（待实现，签名见 api.py）
 │   └── ui/                 # M6c（可选 extras [ui]）：Flask 薄壳，仅调用 api.py
-├── projects/               # 工程资产（声明式）：lonely_boat/{project,style,components,timeline}.yaml
+├── projects/               # 工程资产（声明式）
+│   ├── lonely_boat/        #   静态首片
+│   └── lonely_boat_film/   #   官方示例片（4s 无缝循环，96 帧）
 ├── styles/                 # M6a：可复用风格预设资产 <id>/{style.yaml,constraints.yaml,preview.png}
-├── examples/               # 示例片与接触表
-├── tests/
+│   ├── eastern_minimal/
+│   └── vermilion/
+├── examples/               # 示例片、接触表、成片产出脚本
+│   └── make_official_film.py   # 校验→金帧→mp4→Lottie→快照→manifest 一条命令走完
+├── spike/                  # 可行性验证（§14）
+├── tests/                  # M1–M6 共 110 项
 └── .github/workflows/ci.yml   # ubuntu + macos，golden-frame hash
 ```

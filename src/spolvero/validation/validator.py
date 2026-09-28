@@ -38,9 +38,9 @@ def validate_scene(
 
 
 def _style_constraints(project) -> Optional[Dict]:
-    """从风格预设（M6）惰性读取四约束；不存在则返回 None（不强制构图约束）。"""
+    """从风格预设（M6a）读取四约束 + 扩展 2 阈值；无预设则返回 None（不强制）。"""
     try:
-        from spolvero.styles.presets import get_style
+        from spolvero.styles import get_style
     except Exception:
         return None
     preset = get_style(getattr(project, "style", "") or "")

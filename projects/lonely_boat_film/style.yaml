@@ -1,0 +1,9 @@
+# 东方极简符号构成风格预设（本片引用 styles/eastern_minimal 预设资产）
+name: eastern_minimal
+description: 东方极简符号构成（留白、线条节奏、克制点染）
+default_ink: 0.30
+grayscale: true
+palette:
+  ink: "#1a1a1a"
+  paper: "#F7F5F0"
+  accent: "#9a3b30"

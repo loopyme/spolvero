@@ -1,0 +1,10 @@
+schema_version: 1
+id: eastern_minimal
+severity: warning
+as_error: []
+whitespace_min: 0.8
+color_area_max: 0.0
+density_max: 0.02
+overlap_max: 0.55
+region_count_min: 2
+region_count_max: 60

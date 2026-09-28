@@ -1,12 +1,13 @@
-"""Spolvero CLI。
+"""Spolvero CLI（薄壳：只解析参数并调用 `api.py`，零业务逻辑）。
 
 子命令：
   init      工程目录脚手架（M3）
-  render    渲染工程目录为图片（M3 基础版；完整管线 M5）
-  check     三重校验（M4）
-  snapshot  快照存档（M5）
-  review    人工审核闸门（M10）
-  approve   审核通过（M10）
+  render    渲染工程为单帧图片（M3）
+  check     三重校验：几何 / 相似度 / 构图（M4）
+  film      渲染全片并合成 MP4（M5）
+  snapshot  关键帧快照 + manifest（M5）
+  style     风格预设资产管理：list / show / preview / export（M6a）
+  lottie    Lottie 对接：export（L0）/ import（L1）（M6d）
 """
 
 from __future__ import annotations
@@ -27,14 +28,12 @@ background: "#F7F5F0"
 """
 
 INIT_STYLE = """\
+schema_version: 1
+id: eastern_minimal
 name: eastern_minimal
 description: 东方极简符号构成（留白、线条节奏、克制点染）
 default_ink: 0.30
 grayscale: true
-palette:
-  ink: "#1a1a1a"
-  paper: "#F7F5F0"
-  accent: "#9a3b30"
 """
 
 INIT_COMPONENTS = """\
@@ -54,6 +53,7 @@ items: []
 """
 
 
+# ───────────────────────── init ─────────────────────────
 def _cmd_init(args: argparse.Namespace) -> int:
     d = args.dir
     os.makedirs(d, exist_ok=True)
@@ -76,58 +76,87 @@ def _cmd_init(args: argparse.Namespace) -> int:
     return 0
 
 
-def _cmd_render(args: argparse.Namespace) -> int:
-    from spolvero.dsl.parser import DSLValidationError, load_project
-    from spolvero.render.backend import render
+# ───────────────────────── 公共 ─────────────────────────
+def _load_or_fail(project_dir: str):
+    from spolvero.api import load_project
+    from spolvero.dsl.parser import DSLValidationError
 
     try:
-        proj = load_project(args.project)
+        return load_project(project_dir)
     except DSLValidationError as e:
         print(f"DSL 校验失败：{e}")
-        return 2
+        return None
 
-    backend = args.backend
-    out = args.out
-    if out is None:
-        out = os.path.join(args.project, f"render.{'svg' if backend == 'svg' else 'png'}")
+
+def _resolve_style(style_id):
+    if not style_id:
+        return None
+    from spolvero.api import get_style
+
+    a = get_style(style_id)
+    if a is None:
+        print(f"未知风格预设: {style_id}（用 `spol style list` 查看可用项）")
+    return a
+
+
+def _write(path: str, data) -> None:
+    d = os.path.dirname(os.path.abspath(path))
+    if d:
+        os.makedirs(d, exist_ok=True)
+    if isinstance(data, str):
+        with open(path, "w", encoding="utf-8") as f:
+            f.write(data)
+    else:
+        with open(path, "wb") as f:
+            f.write(data)
+
+
+def _parse_size(s: str):
+    parts = str(s).lower().replace(" ", "").split("x")
+    if len(parts) != 2:
+        raise SystemExit(f"--size 需形如 720x480，收到 {s!r}")
+    return int(parts[0]), int(parts[1])
+
+
+# ───────────────────────── render ─────────────────────────
+def _cmd_render(args: argparse.Namespace) -> int:
+    from spolvero.api import render_project
+
+    proj = _load_or_fail(args.project)
+    if proj is None:
+        return 2
+    style = _resolve_style(args.style or proj.style)
+
+    out = args.out or os.path.join(args.project, "render.svg")
     if out.endswith(".svg"):
         backend = "svg"
     elif out.endswith(".png"):
         backend = "skia"
+    else:
+        backend = args.backend
+        out = f"{out}.{'svg' if backend == 'svg' else 'png'}"
 
-    data = render(
-        proj.groups,
-        backend=backend,
-        width=proj.width,
-        height=proj.height,
-        bg=proj.background,
+    data = render_project(proj, backend=backend, style=style)
+    _write(out, data)
+    tag = f" style={style.id}" if style else ""
+    print(
+        f"rendered {out} ({len(data)} {'chars' if backend == 'svg' else 'bytes'})"
+        f"  seed={proj.seed}{tag}"
     )
-    mode = "w" if backend == "svg" else "wb"
-    with open(out, mode) as f:
-        f.write(data)
-    ext = "chars" if backend == "svg" else "bytes"
-    print(f"rendered {out} ({len(data)} {ext})  seed={proj.seed}")
     return 0
 
 
+# ───────────────────────── check ─────────────────────────
 def _cmd_check(args: argparse.Namespace) -> int:
-    """三重校验（M4）：几何拓扑 / 艺术相似度 / 构图四约束。
-
-    退出码：0 通过（允许含 warning）；1 存在 error（阻断渲染）；2 DSL 非法。
-    --json 输出结构化 Issue 列表，供 AI 自纠闭环回灌（SPEC §8 / §11）。
-    """
     import json
 
-    from spolvero.dsl.parser import DSLValidationError, load_project
-    from spolvero.validation.validator import validate_project
+    from spolvero.api import check_project
 
-    try:
-        proj = load_project(args.project)
-    except DSLValidationError as e:
-        print(f"DSL 校验失败：{e}")
+    proj = _load_or_fail(args.project)
+    if proj is None:
         return 2
 
-    report = validate_project(proj)
+    report = check_project(proj)
     if args.json:
         print(json.dumps([i.to_dict() for i in report.issues], ensure_ascii=False, indent=2))
     else:
@@ -135,16 +164,147 @@ def _cmd_check(args: argparse.Namespace) -> int:
     return 0 if report.passed else 1
 
 
-def _cmd_snapshot(_args: argparse.Namespace) -> int:
-    print("snapshot: (stub) 快照存档待 M5 实现")
+# ───────────────────────── film ─────────────────────────
+def _cmd_film(args: argparse.Namespace) -> int:
+    from spolvero.api import encode_film
+
+    proj = _load_or_fail(args.project)
+    if proj is None:
+        return 2
+    style = _resolve_style(args.style or proj.style)
+    if proj.duration <= 0:
+        print("工程未定义 duration（project.yaml 里写 duration: <秒>），无法成片")
+        return 2
+
+    out = args.out or os.path.join(args.project, "film.mp4")
+    info = encode_film(proj, out, style=style, fps=args.fps, duration=args.duration, crf=args.crf)
+    print(
+        f"film {info['path']}  {info['frames']} 帧 @ {info['fps']}fps  "
+        f"{info['size'][0]}x{info['size'][1]}  {info['bytes'] / 1024:.0f} KiB  "
+        f"循环闭合={info['loop_closed']}"
+    )
+    print(
+        f"  first_frame={info['first_frame_hash'][:16]}…  "
+        f"last_frame={info['last_frame_hash'][:16]}…"
+    )
     return 0
+
+
+# ───────────────────────── snapshot ─────────────────────────
+def _cmd_snapshot(args: argparse.Namespace) -> int:
+    from spolvero.api import snapshot_frames
+
+    proj = _load_or_fail(args.project)
+    if proj is None:
+        return 2
+    style = _resolve_style(args.style or proj.style)
+    times = [float(x) for x in str(args.times).split(",") if x.strip() != ""]
+    out = args.out or os.path.join(args.project, "snapshots")
+    manifest = snapshot_frames(proj, out, times, style=style, label=args.label)
+    print(f"snapshot -> {out}  {len(manifest['frames'])} 帧  label={manifest['label']}")
+    for fr in manifest["frames"]:
+        print(f"  t={fr['t']:.3f}  {fr['file']}  {fr['sha256'][:16]}…")
+    return 0
+
+
+# ───────────────────────── style ─────────────────────────
+def _cmd_style(args: argparse.Namespace) -> int:
+    import json
+
+    from spolvero.api import list_styles, render_preview, render_preview_png, save_style
+    from spolvero.styles import get_style as _get
+
+    root = args.root
+    if args.style_cmd == "list":
+        assets = list_styles(root)
+        if not assets:
+            print(f"（{root}/ 下暂无预设，且无内置预设）")
+            return 0
+        for a in assets:
+            print(a.summary())
+            if a.description:
+                print(f"    {a.description}")
+        return 0
+
+    if args.style_cmd == "show":
+        a = _get(args.id, root)
+        if a is None:
+            print(f"未知风格: {args.id}")
+            return 2
+        print(json.dumps({"style": a.style_dict(), "constraints": a.constraints_dict()},
+                         ensure_ascii=False, indent=2))
+        return 0
+
+    if args.style_cmd == "preview":
+        a = _get(args.id, root)
+        if a is None:
+            print(f"未知风格: {args.id}")
+            return 2
+        w, h = _parse_size(args.size)
+        out = args.out or os.path.join(root, a.id, "preview.svg")
+        if out.endswith(".png"):
+            _write(out, render_preview_png(a, size=(w, h)))
+        else:
+            _write(out, render_preview(a, size=(w, h)))
+        print(f"preview {a.id} -> {out}")
+        return 0
+
+    if args.style_cmd == "export":
+        n = 0
+        for a in list_styles(root):
+            if not args.id or args.id == a.id:
+                save_style(a, root)
+                print(f"wrote {root}/{a.id}/style.yaml, constraints.yaml, preview.png")
+                n += 1
+        print(f"导出 {n} 套预设到 {root}/")
+        return 0 if n else 2
+
+    return 2
+
+
+# ───────────────────────── lottie ─────────────────────────
+def _cmd_lottie(args: argparse.Namespace) -> int:
+    if args.lottie_cmd == "export":
+        from spolvero.api import export_lottie
+
+        proj = _load_or_fail(args.project)
+        if proj is None:
+            return 2
+        style = _resolve_style(args.style or proj.style)
+        out = args.out or os.path.join(args.project, "film.json")
+        info = export_lottie(proj, out, style=style)
+        print(
+            f"lottie {out}  layers={info['layers']}  {info['frames']} 帧  "
+            f"{info['size'][0]}x{info['size'][1]}  {info['bytes'] / 1024:.0f} KiB"
+        )
+        return 0
+
+    if args.lottie_cmd == "import":
+        from spolvero.api import import_lottie
+        from spolvero.core.scene import flatten_all
+        from spolvero.render.backend import render
+
+        try:
+            nodes = import_lottie(args.path)
+        except Exception as e:  # noqa: BLE001 — 导入失败需给用户可读信息
+            print(f"Lottie 导入失败：{e}")
+            return 2
+        out = args.out or os.path.splitext(args.path)[0] + ".png"
+        _write(out, render(nodes, backend="skia"))
+        print(f"imported {args.path} -> {out}  nodes={len(nodes)} leaves={len(flatten_all(nodes))}")
+        return 0
+
+    return 2
 
 
 _COMMANDS = {
     "init": _cmd_init,
     "render": _cmd_render,
     "check": _cmd_check,
+    "film": _cmd_film,
     "snapshot": _cmd_snapshot,
+    "style": _cmd_style,
+    "lottie": _cmd_lottie,
 }
 
 
@@ -161,16 +321,53 @@ def build_parser() -> argparse.ArgumentParser:
     pi.add_argument("--seed", default=None, help="全局随机种子")
     pi.add_argument("--force", action="store_true", help="覆盖已存在文件")
 
-    pr = sub.add_parser("render", help="渲染工程目录为图片")
-    pr.add_argument("--project", required=True, help="工程目录（含 project.yaml 等）")
+    pr = sub.add_parser("render", help="渲染工程为单帧图片")
+    pr.add_argument("--project", required=True)
     pr.add_argument("--backend", default="skia", choices=["svg", "skia"])
-    pr.add_argument("--out", default=None, help="输出文件路径（.svg/.png）")
+    pr.add_argument("--out", default=None, help="输出路径（.svg/.png）")
+    pr.add_argument("--style", default=None, help="风格预设 id（默认为工程 style 字段）")
 
     pc = sub.add_parser("check", help="三重校验（几何/相似度/构图）")
-    pc.add_argument("--project", required=True, help="工程目录")
+    pc.add_argument("--project", required=True)
     pc.add_argument("--json", action="store_true", help="输出结构化 Issue JSON（供自纠回灌）")
 
-    sub.add_parser("snapshot")
+    pf = sub.add_parser("film", help="渲染全片并合成 MP4")
+    pf.add_argument("--project", required=True)
+    pf.add_argument("--out", default=None)
+    pf.add_argument("--style", default=None)
+    pf.add_argument("--fps", type=int, default=None)
+    pf.add_argument("--duration", type=float, default=None)
+    pf.add_argument("--crf", type=int, default=18)
+
+    ps = sub.add_parser("snapshot", help="关键帧快照 + manifest")
+    ps.add_argument("--project", required=True)
+    ps.add_argument("--out", default=None)
+    ps.add_argument("--times", default="0", help="逗号分隔的时刻（秒）")
+    ps.add_argument("--style", default=None)
+    ps.add_argument("--label", default="")
+
+    pst = sub.add_parser("style", help="风格预设资产管理")
+    pst.add_argument("--root", default="styles")
+    ssub = pst.add_subparsers(dest="style_cmd")
+    ssub.add_parser("list", help="列出可用预设")
+    ss = ssub.add_parser("show", help="打印预设 YAML/JSON")
+    ss.add_argument("id")
+    sp = ssub.add_parser("preview", help="渲染预设缩略图（.png 或 .svg）")
+    sp.add_argument("id")
+    sp.add_argument("--out", default=None)
+    sp.add_argument("--size", default="720x480")
+    se = ssub.add_parser("export", help="把内置预设导出到 styles/")
+    se.add_argument("--id", default=None, help="仅导出指定 id")
+
+    pl = sub.add_parser("lottie", help="Lottie 对接（L0 导出 / L1 导入）")
+    lsub = pl.add_subparsers(dest="lottie_cmd")
+    le = lsub.add_parser("export", help="DSL 工程 → Lottie JSON")
+    le.add_argument("--project", required=True)
+    le.add_argument("--out", default=None)
+    le.add_argument("--style", default=None)
+    li = lsub.add_parser("import", help="Lottie JSON → 四原语场景 → 渲染")
+    li.add_argument("path")
+    li.add_argument("--out", default=None)
 
     return p
 

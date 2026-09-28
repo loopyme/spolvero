@@ -148,7 +148,9 @@ def encode_mp4(
         codec="libx264",
         pix_fmt_in="rgb24",
         pix_fmt_out="yuv420p",
-        macro_block_size=None,
+        # =1 关闭 imageio-ffmpeg 的 macro-block 补齐：否则 1600x900 会被静默改成
+        # 1600x912（900 不是 16 的倍数），成片尺寸与画布不一致。yuv420p 只要求偶数边长。
+        macro_block_size=1,
         ffmpeg_log_level="error",
         output_params=["-crf", str(crf), "-movflags", "+faststart"],
     )

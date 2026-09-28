@@ -1,0 +1,10 @@
+schema_version: 1
+id: vermilion
+severity: warning
+as_error: []
+whitespace_min: 0.75
+color_area_max: 0.05
+density_max: 0.024
+overlap_max: 0.6
+region_count_min: 2
+region_count_max: 60

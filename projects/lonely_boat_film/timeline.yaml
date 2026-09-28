@@ -1,0 +1,163 @@
+# 「孤舟渡江」官方示例片时序层（M6 交付）
+# 构图：大量留白；月悬右上；三重远山压低地平线；水纹横贯；孤舟为视觉重心；远岸小舟平衡留白。
+# 布局由显式 transform 控制，与实例顺序无关（命门补充）。顺序即绘制顺序（后者覆盖前者）。
+#
+# 动画约定（animation/track.py）：
+#   translate  世界系平移增量；rotate 绕实例锚点旋转增量；ink_shift 全实例 ink 偏移
+#   每通道首末关键帧同值 + ease: smooth（端点导数为 0）→ 4 秒无缝循环
+#   中间关键帧**刻意不等距**（非 0/2/4 对称）：
+#     若取 t=2 正中对称，smooth 缓动会让 t 与 4-t 的姿态完全相同，
+#     96 帧里只余 49 个不同画面（运动是「出去再原路回来」）。
+#     改为不等距后每帧姿态皆异，运动成为单向缓流，循环仍无缝。
+#   位移量级：远山 < 水纹 < 孤舟，构成轻微视差；幅度压小以维持东方极简的「静」。
+items:
+  - component: moon
+    iid: moon
+    overrides: {r: 24, ink: 0.16, halo: true}
+    transform: {translate: [1230, 175]}
+    anim:
+      - channel: ink_shift
+        ease: smooth
+        keys:
+          - {t: 0.0, v: 0.0}
+          - {t: 1.6, v: -0.05}
+          - {t: 2.8, v: -0.02}
+          - {t: 4.0, v: 0.0}
+
+  - component: mountain
+    iid: m1
+    overrides: {width: 300, height: 72, ink: 0.80, jag: 0.5}
+    transform: {translate: [330, 374]}
+    anim:
+      - channel: translate
+        ease: smooth
+        keys:
+          - {t: 0.0, v: [0, 0]}
+          - {t: 1.2, v: [-5.0, 0.9]}
+          - {t: 2.6, v: [-7.5, 1.3]}
+          - {t: 4.0, v: [0, 0]}
+  - component: mountain
+    iid: m2
+    overrides: {width: 250, height: 54, ink: 0.84, jag: 0.3}
+    transform: {translate: [880, 360]}
+    anim:
+      - channel: translate
+        ease: smooth
+        keys:
+          - {t: 0.0, v: [0, 0]}
+          - {t: 1.6, v: [-3.0, 0.6]}
+          - {t: 3.0, v: [-4.5, 0.9]}
+          - {t: 4.0, v: [0, 0]}
+  - component: mountain
+    iid: m3
+    overrides: {width: 180, height: 42, ink: 0.86, jag: 0.6}
+    transform: {translate: [1330, 380]}
+    anim:
+      - channel: translate
+        ease: smooth
+        keys:
+          - {t: 0.0, v: [0, 0]}
+          - {t: 1.4, v: [1.6, 0.6]}
+          - {t: 2.9, v: [3.4, 1.1]}
+          - {t: 4.0, v: [0, 0]}
+
+  - component: water
+    iid: w1
+    overrides: {width: 940, lines: 4, amp: 4, ink: 0.22, spacing: 15}
+    transform: {translate: [360, 560]}
+    anim:
+      - channel: translate
+        ease: smooth
+        keys:
+          - {t: 0.0, v: [0, 0]}
+          - {t: 1.1, v: [6.0, -1.0]}
+          - {t: 2.7, v: [10.0, -1.7]}
+          - {t: 4.0, v: [0, 0]}
+  - component: water
+    iid: w2
+    overrides: {width: 520, lines: 3, amp: 3, ink: 0.26, spacing: 14}
+    transform: {translate: [1120, 620]}
+    anim:
+      - channel: translate
+        ease: smooth
+        keys:
+          - {t: 0.0, v: [0, 0]}
+          - {t: 1.8, v: [-5.0, 0.9]}
+          - {t: 3.1, v: [-7.5, 1.3]}
+          - {t: 4.0, v: [0, 0]}
+  - component: water
+    iid: w3
+    overrides: {width: 760, lines: 3, amp: 5, ink: 0.20, spacing: 18}
+    transform: {translate: [540, 730]}
+    anim:
+      - channel: translate
+        ease: smooth
+        keys:
+          - {t: 0.0, v: [0, 0]}
+          - {t: 1.3, v: [7.0, -1.3]}
+          - {t: 2.5, v: [12.0, -2.2]}
+          - {t: 4.0, v: [0, 0]}
+  - component: water
+    iid: w_boat
+    overrides: {width: 300, lines: 2, amp: 3, ink: 0.24, spacing: 16}
+    transform: {translate: [838, 700]}
+    anim:
+      - channel: translate
+        ease: smooth
+        keys:
+          - {t: 0.0, v: [0, 0]}
+          - {t: 1.5, v: [3.0, -0.6]}
+          - {t: 2.9, v: [5.5, -1.1]}
+          - {t: 4.0, v: [0, 0]}
+
+  # 孤舟（视觉重心）：缓行 + 轻微起伏（绕自身锚点）+ ink 呼吸
+  - component: boat
+    iid: boat_main
+    overrides: {length: 132, beam_ratio: 0.20, hull_ink: 0.24,
+                has_canopy: true, canopy_w: 0.46, canopy_h: 0.17,
+                has_mast: false, has_lamp: true, tilt: -1.0}
+    transform: {translate: [838, 648]}
+    anim:
+      - channel: translate
+        ease: smooth
+        keys:
+          - {t: 0.0, v: [0, 0]}
+          - {t: 1.3, v: [13.0, -2.8]}
+          - {t: 2.7, v: [19.0, -4.3]}
+          - {t: 4.0, v: [0, 0]}
+      - channel: rotate
+        ease: smooth
+        keys:
+          - {t: 0.0, v: 0.0}
+          - {t: 1.3, v: 1.3}
+          - {t: 2.7, v: 1.9}
+          - {t: 4.0, v: 0.0}
+      - channel: ink_shift
+        ease: smooth
+        keys:
+          - {t: 0.0, v: 0.0}
+          - {t: 1.7, v: 0.03}
+          - {t: 3.0, v: 0.012}
+          - {t: 4.0, v: 0.0}
+
+  # 远岸小舟（留白平衡）：反向缓行，与主舟形成对位
+  - component: boat
+    iid: boat_far
+    overrides: {length: 38, beam_ratio: 0.24, hull_ink: 0.55,
+                has_canopy: true, has_mast: false, has_lamp: false, tilt: 0.8}
+    transform: {translate: [250, 478]}
+    anim:
+      - channel: translate
+        ease: smooth
+        keys:
+          - {t: 0.0, v: [0, 0]}
+          - {t: 1.7, v: [-4.5, 1.1]}
+          - {t: 3.0, v: [-6.5, 1.6]}
+          - {t: 4.0, v: [0, 0]}
+      - channel: rotate
+        ease: smooth
+        keys:
+          - {t: 0.0, v: 0.0}
+          - {t: 1.7, v: -1.6}
+          - {t: 3.0, v: -2.4}
+          - {t: 4.0, v: 0.0}
