@@ -1,0 +1,36 @@
+# 「孤舟渡江 · 三幕」官方故事片
+# 10 秒 @30fps = 300 帧。**不是循环片**：三幕叙事（出航 → 渡江 → 月明），首末姿态刻意不同。
+# 动幅尺度：主舟横穿近整幅画布（画外 x=-120 → x=1190），归鸟横越全画（速度差拉出纵深），
+# 相机绕画布中心推轨（0.92 → 1.09 → 1.04）——主体的位移负责"叙事"，相机的位移负责"观感"。
+seed: spolvero-lonely-boat-v1
+width: 1600
+height: 900
+fps: 30
+duration: 10.0
+style: azurite
+background: "#F8F1DD"
+# 全局相机：translate 世界系像素 / scale 倍率（绕画布中心）/ rotate 度
+camera:
+  - channel: translate
+    ease: smooth
+    keys:
+      - {t: 0.0, v: [0, 0]}
+      - {t: 2.5, v: [-30, 8]}
+      - {t: 5.0, v: [-10, -6]}
+      - {t: 7.5, v: [90, -14]}
+      - {t: 10.0, v: [110, -4]}
+  - channel: scale
+    ease: smooth
+    keys:
+      - {t: 0.0, v: 0.92}
+      - {t: 2.5, v: 0.97}
+      - {t: 5.0, v: 1.02}
+      - {t: 7.5, v: 1.09}
+      - {t: 10.0, v: 1.04}
+  - channel: rotate
+    ease: smooth
+    keys:
+      - {t: 0.0, v: 0.0}
+      - {t: 4.0, v: -0.7}
+      - {t: 7.0, v: 0.5}
+      - {t: 10.0, v: 0.2}

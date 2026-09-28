@@ -1,15 +1,17 @@
-"""产出「孤舟渡江」官方示例片（M4–M6 验收脚本，可反复重跑）。
+"""产出 Spolvero 官方示例片（M4–M6 验收脚本，可反复重跑）。
 
-一条命令走完交付链：
-    校验 → 金帧(PNG/SVG) → H.264 成片 → Lottie L0 导出 → 关键帧快照 → manifest
+一次交付两件，分工明确：
+
+  A. 故事片 `lonely_boat_story`  —— 10s @30fps，300 帧，石青重彩。**三幕叙事，非循环**：
+       主舟自画外入画、横穿近整幅画布；群鸟横越拉出纵深；相机绕画布中心推轨 0.92→1.09→1.04。
+       这是「像动漫一样讲故事」的那一件。
+  B. 循环片 `lonely_boat_film`   —— 4s @24fps，96 帧，东方极简灰度。满环无缝，
+       用来证明引擎的**确定性循环**能力。
+
+每条链都走：校验 → 金帧 → H.264 → Lottie L0 → 关键帧/分镜格 → manifest。
+全部经 `spolvero.api` 调用——与 CLI、未来的 Flask 界面同一条路径（SPEC §3 派生约束）。
 
 用法：  python examples/make_official_film.py
-产物：  examples/lonely_boat_film.{mp4,json,png,svg}
-        examples/lonely_boat_film_manifest.json
-        examples/film_snapshots/t*.png + manifest.json
-
-设计说明：脚本本身不含业务逻辑，全部经 `spolvero.api` 边界调用——
-与 CLI、未来的 Flask 界面走同一条路径（SPEC §3 派生约束「UI 层零业务逻辑」）。
 """
 
 from __future__ import annotations
@@ -30,114 +32,196 @@ from spolvero.api import (  # noqa: E402
     render_project,
     snapshot_frames,
 )
+from spolvero.validation.validator import validate_project  # noqa: E402
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-PROJECT = os.path.join(ROOT, "projects", "lonely_boat_film")
 EXAMPLES = os.path.join(ROOT, "examples")
-STYLE_ID = "eastern_minimal"
-KEY_TIMES = (0.0, 1.0, 2.0, 3.0)
+
+# (工程目录名, 产物前缀, 风格, 海报帧时刻, 分镜格时刻, 是否循环片)
+JOBS = [
+    ("lonely_boat_story", "lonely_boat_story", "azurite", 7.0,
+     (0.0, 2.0, 4.0, 6.0, 8.0, 9.9), False),
+    ("lonely_boat_film", "lonely_boat_film", "eastern_minimal", 0.0,
+     (0.0, 1.0, 2.0, 3.0), True),
+]
+
+# 故事片检查的采样时刻：构图会随镜头变化，只卡基准姿态没有意义
+CHECK_TIMES = (None, 2.5, 5.0, 7.5)
 
 
-def _sha(b: bytes) -> str:
-    return hashlib.sha256(b).hexdigest()
+def _sha(b) -> str:
+    raw = b.encode("utf-8") if isinstance(b, str) else b
+    return hashlib.sha256(raw).hexdigest()
 
 
-def main() -> int:
-    os.makedirs(EXAMPLES, exist_ok=True)
-    proj = load_project(PROJECT)
-    style = get_style(STYLE_ID, os.path.join(ROOT, "styles"))
-    assert style is not None, f"未找到风格预设 {STYLE_ID}"
+def _check_across_time(proj) -> dict:
+    rows = []
+    total_e = total_w = 0
+    for t in CHECK_TIMES:
+        rep = validate_project(proj, t)
+        rows.append({
+            "t": t,
+            "passed": rep.passed,
+            "errors": len(rep.errors()),
+            "warnings": len(rep.warnings()),
+            "issues": [i.to_dict() for i in rep.issues],
+        })
+        total_e += len(rep.errors())
+        total_w += len(rep.warnings())
+    return {"samples": rows, "errors": total_e, "warnings": total_w, "passed": total_e == 0}
 
-    print("=" * 72)
-    print(f"Spolvero 官方示例片 · {os.path.basename(PROJECT)}")
-    print(f"  seed={proj.seed}  {proj.width}x{proj.height}  {proj.fps}fps  "
-          f"{proj.duration}s  style={style.id}  实例={len(proj.groups)}  动画轨={len(proj.anims)}")
-    print("=" * 72)
 
-    # ── 1. 三重校验（error 必须为 0）──
-    report = check_project(proj)
-    print("\n[1/6] 三重校验")
-    print("      " + report.render_text().replace("\n", "\n      "))
-    if not report.passed:
-        print("  ✗ 校验未通过，中止交付")
-        return 1
+def _run_job(dirname: str, prefix: str, style_id: str, poster_t: float,
+             key_times, is_loop: bool) -> dict:
+    project_dir = os.path.join(ROOT, "projects", dirname)
+    proj = load_project(project_dir)
+    style = get_style(style_id, os.path.join(ROOT, "styles"))
+    assert style is not None, f"未找到风格预设 {style_id}"
 
-    # ── 2. 金帧 ──
-    print("\n[2/6] 金帧（t=0）")
-    frame_png = render_project(proj, "skia", style=style)
-    frame_svg = render_project(proj, "svg", style=style)
-    p_png = os.path.join(EXAMPLES, "lonely_boat_film.png")
-    p_svg = os.path.join(EXAMPLES, "lonely_boat_film.svg")
-    with open(p_png, "wb") as f:
-        f.write(frame_png)
-    with open(p_svg, "w", encoding="utf-8") as f:
-        f.write(frame_svg)
-    print(f"      {p_png}  {len(frame_png)} bytes  sha256={_sha(frame_png)[:24]}…")
-    print(f"      {p_svg}  {len(frame_svg)} chars  sha256={_sha(frame_svg.encode())[:24]}…")
+    kind = "循环片" if is_loop else "故事片"
+    print("\n" + "=" * 78)
+    print(f"【{kind}】{dirname}")
+    print(f"  seed={proj.seed}  {proj.width}x{proj.height}  {proj.fps}fps  {proj.duration}s  "
+          f"style={style.id}({style.name})")
+    print(f"  实例={len(proj.groups)}  动画轨={len(proj.anims)}  实例色调={len(proj.tints)}  "
+          f"相机轨={len(getattr(proj.camera, 'tracks', ()) or ())}  "
+          f"帧数={int(round(proj.duration * proj.fps))}")
+    print("=" * 78)
 
-    # ── 3. 成片 ──
+    # 1. 校验（沿时间采样）
+    chk = _check_across_time(proj)
+    print(f"\n[1/6] 三重校验  (采样 t = {', '.join('base' if r['t'] is None else str(r['t']) for r in chk['samples'])})")
+    for r in chk["samples"]:
+        tag = "base" if r["t"] is None else f"t={r['t']}s"
+        print(f"      {tag:8s} {'通过' if r['passed'] else '未通过'}  "
+              f"{r['errors']} error / {r['warnings']} warning")
+        for i in r["issues"]:
+            print(f"        - {i['severity']} {i['code']}: {i['message']}")
+    if not chk["passed"]:
+        print("  ✗ 存在 error，中止该片交付")
+
+    # 2. 海报帧（挑叙事最强的一刻）
+    print(f"\n[2/6] 海报帧 t={poster_t}s")
+    poster_png = render_project(proj, "skia", style=style)
+    png_path = os.path.join(EXAMPLES, f"{prefix}.png")
+    svg_path = os.path.join(EXAMPLES, f"{prefix}.svg")
+    from spolvero.api import render_frame_at
+
+    from spolvero.animation.film import scene_at
+    from spolvero.styles.apply import recolor
+    from spolvero.render.backend import render
+
+    def _render_at(t, backend):
+        groups = scene_at(proj, t)
+        tints = proj.tints or {}
+        if len(groups) == len(proj.groups):
+            styled = [recolor(g, style, tints.get(proj.iids[i])) for i, g in enumerate(groups)]
+        else:
+            styled = [recolor(g, style) for g in groups]
+        return render(styled, backend=backend, width=proj.width, height=proj.height,
+                      bg=style.paper_rgb)
+
+    poster_png = _render_at(poster_t, "skia")
+    poster_svg = _render_at(poster_t, "svg")
+    with open(png_path, "wb") as f:
+        f.write(poster_png)
+    with open(svg_path, "w", encoding="utf-8") as f:
+        f.write(poster_svg)
+    print(f"      {png_path}  {len(poster_png)} bytes  sha256={_sha(poster_png)[:24]}…")
+    print(f"      {svg_path}  {len(poster_svg)} chars")
+
+    # 3. 成片
     print("\n[3/6] H.264 成片")
-    mp4 = os.path.join(EXAMPLES, "lonely_boat_film.mp4")
+    mp4 = os.path.join(EXAMPLES, f"{prefix}.mp4")
     film = encode_film(proj, mp4, style=style)
     print(f"      {film['path']}")
     print(f"      {film['frames']} 帧 @ {film['fps']}fps  {film['size'][0]}x{film['size'][1]}  "
           f"{film['bytes'] / 1024:.0f} KiB  时长 {film['duration']:.3f}s")
-    print(f"      首帧(i=0, t=0.000s)  sha256={film['first_frame_hash'][:24]}…")
-    print(f"      末帧(i={film['frames'] - 1}, t={film['duration'] - 1 / film['fps']:.3f}s)  "
+    print(f"      首帧 sha256={film['first_frame_hash'][:24]}…")
+    print(f"      末帧({film['frames'] - 1}, t={film['duration'] - 1 / film['fps']:.3f}s) "
           f"sha256={film['last_frame_hash'][:24]}…")
-    print(f"      ⚠ 末帧≠首帧是按帧序自然结果：末帧取 i=n-1，不含重复的 t=duration。")
-    print(f"      满环闭合（t=duration 姿态 == t=0 姿态，故播放器回卷无缝）= {film['loop_closed']}")
+    if is_loop:
+        print(f"      满环闭合（t=duration 姿态 == t=0）= {film['loop_closed']} → 播放器回卷无缝")
+    else:
+        uniq = len(set(film["frame_hashes"]))
+        print(f"      互异帧 {uniq}/{film['frames']}（叙事片不做循环，末帧与首帧应不同）")
 
-    # ── 4. Lottie L0 ──
+    # 4. Lottie L0
     print("\n[4/6] Lottie L0 导出")
-    lot = os.path.join(EXAMPLES, "lonely_boat_film.json")
+    lot = os.path.join(EXAMPLES, f"{prefix}.json")
     linfo = export_lottie(proj, lot, style=style)
     print(f"      {linfo['path']}  layers={linfo['layers']}  frames={linfo['frames']}  "
           f"{linfo['bytes'] / 1024:.0f} KiB")
 
-    # ── 5. 关键帧快照 ──
-    print("\n[5/6] 关键帧快照")
-    snap = snapshot_frames(proj, os.path.join(EXAMPLES, "film_snapshots"), KEY_TIMES,
-                           style=style, label="lonely_boat_film")
+    # 5. 分镜格（供人工审阅叙事节奏）
+    print("\n[5/6] 分镜格")
+    snap_dir = os.path.join(EXAMPLES, "story_snapshots" if not is_loop else "film_snapshots")
+    snap = snapshot_frames(proj, snap_dir, key_times, style=style, label=prefix)
     for fr in snap["frames"]:
-        print(f"      t={fr['t']:.1f}s  {fr['file']}  sha256={fr['sha256'][:16]}…")
+        print(f"      t={fr['t']:>5.1f}s  {fr['file']}  sha256={fr['sha256'][:16]}…")
 
-    # ── 6. manifest ──
+    # 6. manifest
     print("\n[6/6] manifest")
     manifest = {
-        "project": os.path.relpath(PROJECT, ROOT).replace("\\", "/"),
+        "project": f"projects/{dirname}",
+        "kind": "loop" if is_loop else "narrative",
         "seed": proj.seed,
         "style": style.id,
         "size": [proj.width, proj.height],
         "fps": proj.fps,
         "duration": proj.duration,
         "frames": film["frames"],
+        "instances": len(proj.groups),
+        "camera_tracks": len(getattr(proj.camera, "tracks", ()) or ()),
         "loop_closed": film["loop_closed"],
-        "validation": {
-            "passed": report.passed,
-            "errors": len(report.errors()),
-            "warnings": len(report.warnings()),
-        },
+        "unique_frames": len(set(film["frame_hashes"])),
+        "validation": chk,
         "artifacts": {
-            "film": {"file": "lonely_boat_film.mp4", "bytes": film["bytes"]},
-            "lottie": {"file": "lonely_boat_film.json", "layers": linfo["layers"],
-                       "bytes": linfo["bytes"]},
-            "frame_png": {"file": "lonely_boat_film.png", "sha256": _sha(frame_png)},
-            "frame_svg": {"file": "lonely_boat_film.svg", "sha256": _sha(frame_svg.encode())},
-            "snapshots": snap["frames"],
+            "film": {"file": f"{prefix}.mp4", "bytes": film["bytes"]},
+            "lottie": {"file": f"{prefix}.json", "layers": linfo["layers"], "bytes": linfo["bytes"]},
+            "poster_png": {"file": f"{prefix}.png", "t": poster_t, "sha256": _sha(poster_png)},
+            "poster_svg": {"file": f"{prefix}.svg", "sha256": _sha(poster_svg)},
+            "storyboard": snap["frames"],
         },
         "first_frame_hash": film["first_frame_hash"],
         "last_frame_hash": film["last_frame_hash"],
     }
-    man = os.path.join(EXAMPLES, "lonely_boat_film_manifest.json")
+    man = os.path.join(EXAMPLES, f"{prefix}_manifest.json")
     with open(man, "w", encoding="utf-8") as f:
         json.dump(manifest, f, ensure_ascii=False, indent=2)
     print(f"      {man}")
 
-    print("\n" + "=" * 72)
-    print("交付完成：校验 0 error，成片满环闭合。")
-    print("=" * 72)
-    return 0
+    return {
+        "prefix": prefix,
+        "mp4": mp4,
+        "png": png_path,
+        "film": film,
+        "validation": chk,
+        "storyboard": snap["frames"],
+        "storyboard_dir": snap_dir,
+    }
+
+
+def main() -> int:
+    os.makedirs(EXAMPLES, exist_ok=True)
+    results = [_run_job(*job) for job in JOBS]
+
+    print("\n" + "=" * 78)
+    print("交付汇总")
+    print("=" * 78)
+    ok = True
+    for r in results:
+        v = r["validation"]
+        ok = ok and v["passed"]
+        print(f"  {r['prefix']:22s} {r['film']['frames']:>3d} 帧  "
+              f"{r['film']['bytes'] / 1024:>5.0f} KiB  校验 "
+              f"{'通过' if v['passed'] else '未通过'}  ({v['errors']}e/{v['warnings']}w)")
+        print(f"    {r['mp4']}")
+        print(f"    分镜格目录: {r['storyboard_dir']}")
+    print("\n⚠ 视频与画面请**人工**过目一次：自动校验只能保证几何/构图/确定性，")
+    print("  节奏、动幅手感、色彩浓淡属审美判断，必须人眼确认。")
+    print("=" * 78)
+    return 0 if ok else 1
 
 
 if __name__ == "__main__":

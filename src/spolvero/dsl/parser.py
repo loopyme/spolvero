@@ -186,6 +186,7 @@ def load_project(dir_path: str) -> Project:
     groups: List[Group] = []
     iids: List[str] = []
     anims: dict = {}
+    tints: dict = {}
     for idx, item in enumerate(timeline.get("items", [])):
         iid, g = _parse_item(item, idx, lib, seed)
         if iid in anims or iid in iids:
@@ -194,17 +195,26 @@ def load_project(dir_path: str) -> Project:
             )
         iids.append(iid)
         groups.append(g)
+        if item.get("tint"):
+            tints[iid] = item["tint"]
         if item.get("anim"):
             try:
                 anims[iid] = parse_anim(item["anim"])
             except ValueError as e:
                 raise DSLValidationError("timeline", f"items[{idx}].anim", str(e))
 
+    camera = None
+    if project.get("camera"):
+        try:
+            camera = parse_anim(project["camera"])
+        except ValueError as e:
+            raise DSLValidationError("project.yaml", "camera", str(e))
+
     duration = float(project.get("duration", 0.0) or 0.0)
-    if anims and duration <= 0.0:
+    if (anims or camera) and duration <= 0.0:
         raise DSLValidationError(
             "project.yaml", "duration",
-            "timeline 含 anim 关键帧但 project.yaml 未给 duration（成片时长，秒）",
+            "timeline 含 anim 关键帧或 camera 但 project.yaml 未给 duration（成片时长，秒）",
         )
 
     return Project(
@@ -220,4 +230,6 @@ def load_project(dir_path: str) -> Project:
         duration=duration,
         iids=tuple(iids),
         anims=anims,
+        tints=tints,
+        camera=camera,
     )

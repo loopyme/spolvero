@@ -1,0 +1,9 @@
+# 石青重彩（本片引用的风格预设资产见 styles/azurite/）
+name: azurite
+description: 青绿重彩——石青为骨、石绿为水、朱砂与藤黄作点；颜色靠实例 tint 分层
+default_ink: 0.30
+grayscale: false
+palette:
+  ink: "#123A5E"
+  paper: "#F8F1DD"
+  accent: "#C8442E"

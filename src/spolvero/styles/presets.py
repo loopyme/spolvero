@@ -100,13 +100,56 @@ _VERMILION_CONSTRAINTS: Dict = {
     "region_count_max": 60,
 }
 
+# ── 3. azurite：石青重彩（鲜亮，故事片默认）──
+_AZURITE: Dict = {
+    "schema_version": SCHEMA_VERSION,
+    "id": "azurite",
+    "name": "石青重彩",
+    "description": (
+        "青绿重彩：以石青为骨、石绿为水、朱砂与藤黄作点。颜色靠**实例级 tint** 分层——"
+        "每个构件在自己的色系内做明暗（纸→淡→本色→深），而不是全片压成同一个色相。"
+        "适合需要「亮起来」并承担叙事的片子；彩面积不做上限约束（本风格就是要鲜亮）。"
+    ),
+    "default_ink": 0.30,
+    "grayscale": False,
+    "fidelity_default": 0.0,
+    "sources": [],
+    "tone": {
+        "palette": {"paper": "#F8F1DD", "base": "#2E7BB5", "ink": "#123A5E"},
+        "accents": ["#C8442E", "#E0A22B", "#3FA36B"],
+        "purity_axis": 0.80,
+    },
+    "composition": {
+        "whiteness": 0.85,
+        "color_area": 0.0,
+        "density_profile": [],
+        "clustering": 0.30,
+        "region_count": 6,
+        "centroid": [0.47, 0.57],
+        "axis_deg": 0.0,
+    },
+    "texture": {"stroke_coherence": 0.0, "grain": 0.0, "edge_hardness": 1.0},
+}
+# 注意：**不设 color_area_max**——本风格的目标就是「鲜亮」，用彩面积上限去卡它与设计意图相悖。
+_AZURITE_CONSTRAINTS: Dict = {
+    "severity": "warning",
+    "as_error": [],
+    "whitespace_min": 0.60,
+    "density_max": 0.060,
+    "overlap_max": 0.90,
+    "region_count_min": 2,
+    "region_count_max": 80,
+}
+
 OFFICIAL_STYLES: Dict[str, Dict] = {
     "eastern_minimal": _EASTERN_MINIMAL,
     "vermilion": _VERMILION,
+    "azurite": _AZURITE,
 }
 OFFICIAL_CONSTRAINTS: Dict[str, Dict] = {
     "eastern_minimal": _EASTERN_MINIMAL_CONSTRAINTS,
     "vermilion": _VERMILION_CONSTRAINTS,
+    "azurite": _AZURITE_CONSTRAINTS,
 }
 
 _CACHE: Optional[Dict[str, StyleAsset]] = None

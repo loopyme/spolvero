@@ -352,3 +352,124 @@ def test_animated_project_exports_baked_keyframes():
             if prop["a"] == 1:
                 assert len(prop["k"]) == 12, f"{layer['nm']}.{ch} 未逐帧烘焙"
                 assert all(k.get("h") == 1 for k in prop["k"])
+
+
+# ───────────────────────── 实例级色调 tint ─────────────────────────
+def test_tint_overrides_grayscale_style():
+    """显式 tint 优先于风格的 grayscale：给了颜色却被静默忽略是最糟的意外。"""
+    a = get_style("eastern_minimal")
+    node = _sq(0.2)
+    assert getattr(recolor(node, a), "color") is None
+    assert getattr(recolor(node, a, "#2E7BB5"), "color") is not None
+
+
+def test_tint_ramp_keeps_tonal_depth_within_one_hue():
+    """tint 不是把实例压成单色：ink 仍在「纸→淡→本色→深」之间取层次。"""
+    from spolvero.styles.apply import ink_to_rgb, tint_stops
+
+    a = get_style("azurite")
+    stops = tint_stops(a, "#2E7BB5")
+    assert ink_to_rgb(1.0, a, "#2E7BB5") == parse_hex(a.tone.paper)
+    assert ink_to_rgb(0.34, a, "#2E7BB5") == parse_hex("#2E7BB5")
+    lum = [sum(ink_to_rgb(i / 20.0, a, "#2E7BB5")) for i in range(21)]
+    assert lum == sorted(lum), "ink 越大应越浅"
+    assert len(set(lum)) > 12, "层次不足，说明被压成了单色"
+
+
+def test_tint_beats_palette_but_loses_to_explicit_color():
+    a = get_style("azurite")
+    node = _sq(0.2, color="#00ff00")
+    assert getattr(recolor(node, a, "#2E7BB5"), "color") == "#00ff00"
+
+
+def test_recolor_all_pairs_tints_with_iids():
+    from spolvero.styles.apply import recolor_all
+
+    a = get_style("azurite")
+    nodes = [Group((_sq(0.3),), Transform.identity()) for _ in range(2)]
+    out = recolor_all(nodes, a, {"a": "#2E7BB5", "b": "#C8442E"}, ("a", "b"))
+    c0 = out[0].children[0].color
+    c1 = out[1].children[0].color
+    assert c0 != c1
+    assert c0 is not None and c1 is not None
+
+
+def test_azurite_preset_is_vivid_and_does_not_cap_color_area():
+    a = get_style("azurite")
+    assert a.grayscale is False
+    assert len(a.tone.accents) == 3
+    assert "color_area_max" not in a.constraints, "重彩风格不该用彩面积上限卡自己"
+
+
+# ───────────────────────── 全局相机 ─────────────────────────
+def _cam_project():
+    import tempfile
+
+    from tests.test_m5 import _components_yaml
+
+    d = tempfile.mkdtemp()
+    open(os.path.join(d, "project.yaml"), "w", encoding="utf-8").write(
+        "seed: cam\nwidth: 200\nheight: 100\nduration: 2.0\nfps: 10\nstyle: azurite\n"
+        'background: "#FFFFFF"\n'
+        "camera:\n"
+        "  - channel: scale\n    ease: linear\n"
+        "    keys:\n      - {t: 0.0, v: 1.0}\n      - {t: 2.0, v: 2.0}\n"
+    )
+    open(os.path.join(d, "style.yaml"), "w", encoding="utf-8").write("name: azurite\n")
+    open(os.path.join(d, "components.yaml"), "w", encoding="utf-8").write(_components_yaml())
+    open(os.path.join(d, "timeline.yaml"), "w", encoding="utf-8").write(
+        "items:\n  - component: boat\n    iid: b1\n    transform: {translate: [100, 50]}\n"
+    )
+    return load_project(d)
+
+
+def test_project_camera_parses_and_wraps_scene():
+    from spolvero.animation.film import scene_at
+
+    proj = _cam_project()
+    assert proj.camera is not None and len(proj.camera.tracks) == 1
+    assert proj.is_animated
+    wrapped = scene_at(proj, 1.0)
+    assert len(wrapped) == 1, "相机应把整场包成一个合成层"
+    assert len(wrapped[0].children) == len(proj.groups)
+
+
+def test_camera_scale_is_about_canvas_center():
+    from spolvero.animation.film import scene_at
+
+    proj = _cam_project()
+    # t=0 时相机为恒等（scale=1），scene_at 不会外包合成层，故取中间时刻比较
+    at1 = scene_at(proj, 1.0)[0]
+    at2 = scene_at(proj, 2.0)[0]
+    cx, cy = proj.width / 2.0, proj.height / 2.0
+    for t, m in ((1.0, at1.transform), (2.0, at2.transform)):
+        px, py = m(cx, cy)
+        assert abs(px - cx) < 1e-6 and abs(py - cy) < 1e-6, f"t={t} 相机缩放中心未钉在画布中心"
+    assert at2.transform.a > at1.transform.a, "scale 通道应体现为倍率递增"
+
+
+def test_camera_requires_duration():
+    from spolvero.dsl.parser import DSLValidationError
+
+    import tempfile
+
+    from tests.test_m5 import _components_yaml
+
+    d = tempfile.mkdtemp()
+    open(os.path.join(d, "project.yaml"), "w", encoding="utf-8").write(
+        'seed: cam\nwidth: 200\nheight: 100\nfps: 10\nstyle: azurite\nbackground: "#FFFFFF"\n'
+        "camera:\n  - channel: scale\n    keys:\n      - {t: 0.0, v: 1.0}\n"
+    )
+    open(os.path.join(d, "style.yaml"), "w", encoding="utf-8").write("name: azurite\n")
+    open(os.path.join(d, "components.yaml"), "w", encoding="utf-8").write(_components_yaml())
+    open(os.path.join(d, "timeline.yaml"), "w", encoding="utf-8").write("items: []\n")
+    with pytest.raises(DSLValidationError) as ei:
+        load_project(d)
+    assert "duration" in str(ei.value)
+
+
+def test_tint_field_parsed_from_timeline():
+    proj = load_project(os.path.join(ROOT, "projects", "lonely_boat_story"))
+    assert proj.tints["boat_main"] == "#C8442E"
+    assert proj.tints["m1"] == "#2E7BB5"
+    assert len(proj.tints) == len(proj.groups)

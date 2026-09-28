@@ -1,0 +1,41 @@
+{
+  "label": "lonely_boat_story",
+  "seed": "spolvero-lonely-boat-v1",
+  "style": "azurite",
+  "size": [
+    1600,
+    900
+  ],
+  "frames": [
+    {
+      "t": 0.0,
+      "file": "t0000.000.png",
+      "sha256": "1605165c4a72dc249f11297cd0f43b9e483d17fb8291eafde158974c1694a011"
+    },
+    {
+      "t": 2.0,
+      "file": "t0002.000.png",
+      "sha256": "d15ea940b2c05bdec2bdffc83141caf989cbf9572b442e3ac1dfebb81cf521e2"
+    },
+    {
+      "t": 4.0,
+      "file": "t0004.000.png",
+      "sha256": "5bb8846d698e4493ca4e3d72254b175933ead6ff3d5cee36d78f305a5e647ab3"
+    },
+    {
+      "t": 6.0,
+      "file": "t0006.000.png",
+      "sha256": "b55a0b7f581204595d12a6b726b104d5e759013c73d62bbda1c356f15111c98d"
+    },
+    {
+      "t": 8.0,
+      "file": "t0008.000.png",
+      "sha256": "7b3bc78ec2d322953051c73244ae23b5769a789ccb6a755b1c31157c7c24bfe3"
+    },
+    {
+      "t": 9.9,
+      "file": "t0009.900.png",
+      "sha256": "a19625015acd6aa29cc680ff77dc07709926ec3e72daa5f3eb8bbd396085e0ae"
+    }
+  ]
+}

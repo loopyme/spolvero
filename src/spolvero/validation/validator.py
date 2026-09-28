@@ -39,18 +39,57 @@ def validate_scene(
 
 def _style_constraints(project) -> Optional[Dict]:
     """从风格预设（M6a）读取四约束 + 扩展 2 阈值；无预设则返回 None（不强制）。"""
+    preset = _style_of(project)
+    return preset.constraints if preset else None
+
+
+def _style_of(project):
     try:
         from spolvero.styles import get_style
     except Exception:
         return None
-    preset = get_style(getattr(project, "style", "") or "")
-    return preset.constraints if preset else None
+    return get_style(getattr(project, "style", "") or "")
 
 
-def validate_project(project) -> ValidationReport:
-    """校验整个工程（M3 的 Project / M5 的 AnimatedProject 通用）。"""
-    leaves = flatten_all(project.groups)
-    constraints = _style_constraints(project)
+def _styled_leaves(project, t: Optional[float] = None) -> List:
+    """按风格 + 实例 tint 着色后拍平——校验必须作用于**实际会被渲染的颜色与位置**，
+    否则彩色与灰度会算出同一个彩面积，约束形同虚设。
+    `t` 给定时先求该时刻的场景（含相机），用于校验动画过程中的构图是否越界。
+    """
+    if t is None:
+        groups = list(project.groups)
+    else:
+        from spolvero.animation.film import scene_at
+
+        groups = scene_at(project, t)
+    preset = _style_of(project)
+    if preset is None:
+        return flatten_all(groups)
+
+    from spolvero.styles.apply import recolor
+
+    tints = getattr(project, "tints", None) or {}
+    iids = getattr(project, "iids", ()) or ()
+    # 相机可能把整场包成一个 Group；只有与 groups 等长时才逐实例取 tint
+    if len(groups) == len(iids):
+        groups = [
+            recolor(g, preset, tints.get(iids[i])) for i, g in enumerate(groups)
+        ]
+    else:
+        groups = [recolor(g, preset) for g in groups]
+    return flatten_all(groups)
+
+
+def validate_project(project, t: Optional[float] = None) -> ValidationReport:
+    """校验整个工程（M3 的 Project / M5 的 AnimatedProject 通用）。
+
+    t=None 校验 DSL 声明的**基准姿态**；给定 t 则校验该时刻（含动画与相机）——
+    故事片的构图会随镜头变化，只卡基准姿态没有意义。
+    """
     return validate_scene(
-        leaves, project.width, project.height, constraints, label="project"
+        _styled_leaves(project, t),
+        project.width,
+        project.height,
+        _style_constraints(project),
+        label="project" if t is None else f"t={t:g}s",
     )

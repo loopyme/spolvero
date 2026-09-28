@@ -43,7 +43,14 @@ def _styled_groups(project: Project, style: Optional[StyleAsset], t: Optional[fl
 
     groups = scene_at(project, t) if t is not None else list(project.groups)
     if style is not None:
-        groups = recolor_all(groups, style)
+        # 相机可能把整个场景包成单个 Group：此时实例与 iid 的对应关系仍按 project.iids 逐项着色
+        tints = getattr(project, "tints", None) or {}
+        if len(groups) == len(project.groups):
+            groups = recolor_all(groups, style, tints, project.iids)
+        else:
+            from spolvero.styles.apply import recolor
+
+            groups = [recolor(g, style) for g in groups]
     return groups
 
 

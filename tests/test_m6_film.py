@@ -148,3 +148,114 @@ def test_style_asset_roundtrip_equality():
     for sid, asset in builtin_styles().items():
         assert StyleAsset.from_dicts(asset.style_dict(), asset.constraints_dict()).style_dict() \
             == asset.style_dict()
+
+
+# ═══════════════════ 故事片（叙事 + 大动幅 + 重彩）═══════════════════
+STORY = os.path.join(ROOT, "projects", "lonely_boat_story")
+
+
+def _story():
+    return load_project(STORY)
+
+
+def test_story_project_shape():
+    proj = _story()
+    assert proj.duration == 10.0 and proj.fps == 30
+    assert int(round(proj.duration * proj.fps)) == 300
+    assert len(proj.groups) == 16
+    assert len(proj.tints) == 16, "每个实例都应有自己的色调"
+    assert proj.camera is not None
+    assert {t.channel for t in proj.camera.tracks} == {"translate", "scale", "rotate"}
+
+
+def test_story_is_narrative_not_loop():
+    """叙事片的契约与循环片相反：首末姿态**必须**不同，否则等于没有故事。"""
+    proj = _story()
+    assert not _loop_closed(proj, proj.duration)
+    assert scene_at(proj, 0.0) != scene_at(proj, proj.duration)
+
+
+def test_story_boat_traverses_most_of_the_canvas():
+    """动幅硬指标：主舟自身横移 ≥80% 画布宽度，且**自身**轨迹单向不回头。
+
+    只看屏幕空间会误判：相机有轻微摇摆（推轨时左右微调），会让屏幕坐标瞬时回退 1px 级，
+    那是镜头手感而非主体倒退。所以单调性判在主体自身位移上，跨度则两边都卡。
+    """
+    proj = _story()
+    tr = proj.anims["boat_main"].track("translate")
+    assert tr is not None
+    own = [tr.sample(i / 30.0)[0] for i in range(300)]
+    assert own == sorted(own), "主舟自身位移应单向渡江"
+    assert own[-1] - own[0] >= 0.80 * proj.width, f"主舟自身横移仅 {own[-1] - own[0]:.0f}px"
+
+    idx = proj.iids.index("boat_main")
+
+    def screen_x(t):
+        outer = scene_at(proj, t)[0]  # 相机合成层
+        m = outer.transform.compose(outer.children[idx].transform)
+        return m(0.0, 0.0)[0]
+
+    xs = [screen_x(i / 30.0) for i in range(300)]
+    assert max(xs) - min(xs) >= 0.80 * proj.width, f"屏幕空间横移仅 {max(xs) - min(xs):.0f}px"
+    assert xs[0] < 0.05 * proj.width and xs[-1] > 0.75 * proj.width, "应自画外左侧入画、收于右侧"
+
+
+def test_story_has_no_micro_motion_only():
+    """回归用户反馈「基本没动」：相邻采样帧必须有可观差异。"""
+    from spolvero.api import render_frame_at
+    from spolvero.render.skia import png_to_rgb
+
+    proj = _story()
+    st = get_style("azurite")
+
+    def diff(a, b):
+        ra, rb = png_to_rgb(a), png_to_rgb(b)
+        return sum(
+            1
+            for i in range(0, len(ra), 3)
+            if abs(ra[i] - rb[i]) + abs(ra[i + 1] - rb[i + 1]) + abs(ra[i + 2] - rb[i + 2]) > 28
+        ) / (len(ra) // 3)
+
+    a = render_frame_at(proj, 0.0, "skia", st)
+    b = render_frame_at(proj, 5.0, "skia", st)
+    assert diff(a, b) > 0.02, f"半程间画面仅变了 {diff(a, b) * 100:.2f}%，仍属微动"
+
+
+def test_story_is_vivid_not_gray():
+    from spolvero.api import render_frame_at
+    from spolvero.render.skia import png_to_rgb
+
+    proj = _story()
+    st = get_style("azurite")
+    rgb = png_to_rgb(render_frame_at(proj, 7.0, "skia", st))
+    bg = st.paper_rgb
+    chroma, n = 0, 0
+    for i in range(0, len(rgb), 3):
+        r, g, b = rgb[i], rgb[i + 1], rgb[i + 2]
+        if abs(r - bg[0]) + abs(g - bg[1]) + abs(b - bg[2]) > 40:
+            chroma += max(r, g, b) - min(r, g, b)
+            n += 1
+    assert n > 0
+    assert chroma / n > 40, f"平均色度仅 {chroma / n:.1f}，谈不上鲜亮"
+
+
+def test_story_validation_passes_across_the_shot():
+    from spolvero.validation.validator import validate_project
+
+    proj = _story()
+    for t in (None, 2.5, 5.0, 7.5):
+        rep = validate_project(proj, t)
+        assert rep.passed, f"t={t}: {rep.render_text()}"
+        assert rep.warnings() == [], f"t={t}: {[i.code for i in rep.warnings()]}"
+
+
+def test_story_encodes_and_exports():
+    pytest.importorskip("lottie")
+    proj = _story()
+    st = get_style("azurite")
+    out = os.path.join(tempfile.mkdtemp(), "story.mp4")
+    info = encode_film(proj, out, style=st, fps=6, duration=1.0)
+    assert info["frames"] == 6 and os.path.getsize(out) > 0
+    lot = os.path.join(tempfile.mkdtemp(), "story.json")
+    linfo = export_lottie(proj, lot, style=st)
+    assert linfo["frames"] == 300 and linfo["layers"] == 16

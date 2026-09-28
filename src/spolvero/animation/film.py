@@ -19,6 +19,7 @@ from typing import Dict, Iterator, List, Optional, Sequence, Tuple
 
 from spolvero.core.primitives import Group, InkDot, InkLine, InkShape
 from spolvero.core.scene import Node
+from spolvero.core.transform import Transform
 from spolvero.render.backend import render
 
 Bg = Tuple[int, int, int]
@@ -46,7 +47,12 @@ def shift_ink(node: Node, delta: float) -> Node:
 
 # ───────────────────────── 逐帧求值 ─────────────────────────
 def scene_at(project, t: float) -> List[Group]:
-    """求 t 时刻的场景（相对基准姿态施加各实例的动画增量）。"""
+    """求 t 时刻的场景。
+
+    两层：先按实例施加各自的动画增量（translate/rotate/scale/ink_shift），
+    再在最外层套一个**全局相机**（绕画布中心的推/拉/摇）——对应动漫的镜头调度：
+    主体的位移负责"叙事"，相机的位移负责"观感"。
+    """
     anims = getattr(project, "anims", None) or {}
     iids = getattr(project, "iids", ()) or ()
     out: List[Group] = []
@@ -63,6 +69,13 @@ def scene_at(project, t: float) -> List[Group]:
         if s:
             node = Group(tuple(shift_ink(c, s) for c in node.children), node.transform)
         out.append(node)
+
+    cam = getattr(project, "camera", None)
+    if cam is not None and getattr(cam, "tracks", None):
+        px, py = project.width / 2.0, project.height / 2.0
+        m = cam.delta_transform(t, px, py)
+        if m != Transform.identity():
+            return [Group(tuple(out), m)]
     return out
 
 

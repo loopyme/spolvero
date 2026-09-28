@@ -27,10 +27,13 @@ class Project:
     duration: float = 0.0  # 成片时长（秒）；0 表示静态工程
     iids: Tuple[str, ...] = ()  # 与 groups 一一对应的实例 id
     anims: dict = field(default_factory=dict)  # iid -> AnimSet
+    # —— M6a 色彩与镜头 ——
+    tints: dict = field(default_factory=dict)  # iid -> "#RRGGBB"（实例级色系）
+    camera: object = None  # AnimSet | None，全局相机（绕画布中心）
 
     def scene(self) -> list[Group]:
         return list(self.groups)
 
     @property
     def is_animated(self) -> bool:
-        return bool(self.anims) and self.duration > 0.0
+        return bool(self.anims or self.camera) and self.duration > 0.0

@@ -2,10 +2,14 @@
 
 > Symbol Composition Animator — 矢量动画的确定性编译层
 > 本文件是 Spolvero 的权威工程规范。所有代码、DSL、CI、文档以本文件为基准。
-> 状态：可行性已 spike 验证（§14），**M0–M5 与 M6a／M6d 已完成（110 项测试全绿）**，
-> 官方示例片 `examples/lonely_boat_film.mp4` 已产出（4s 无缝循环、96/96 帧互异）。
+> 状态：可行性已 spike 验证（§14），**M0–M5 与 M6a／M6d 已完成（126 项测试全绿）**。
+> 官方交付两件：**故事片** `examples/lonely_boat_story.mp4`（10s 三幕叙事，300/300 帧互异，
+> 主舟横穿 85% 画布，石青重彩）与**循环片** `examples/lonely_boat_film.mp4`（4s 满环无缝）。
 > 下一步 M6b 风格转录器（签名已在 `api.py` 定死）、M6c 本地界面。
 > M6 已拆分（M6a 预设资产 / M6b 转录器 / M6c 本地界面 / M6d Lottie），风格转录方案见 §7.2。
+>
+> **审查分工（用户 2026-09-28 明确）**：自动校验只负责几何 / 构图 / 确定性；
+> **成片与画面一律交人工过目**——动幅手感、叙事节奏、色彩浓淡属审美判断，不得由脚本自行判定通过。
 
 ---
 
@@ -145,15 +149,26 @@
 工程目录四文件，均经 JSON Schema 校验（`dsl/schema.py`），错误定位到字段路径（`DSLValidationError`）：
 
 ```
-project.yaml    seed / width / height / fps / style / background(#RRGGBB)
+project.yaml    seed / width / height / fps / duration / style / background(#RRGGBB)
+                camera: [ {channel,ease,keys} ]          ← 可选，全局镜头（推/拉/摇）
 style.yaml      name / description / default_ink / grayscale / palette{#RRGGBB 调色板}
 components.yaml  [ {name, pattern, params:[{name,default,lo,hi,kind,p_true}]} ]  ← 构件*定义*为声明式资产
-timeline.yaml   items: [ {component,iid,overrides,transform} | {primitive,iid,points/ring/pos,...} ]
+timeline.yaml   items: [ {component,iid,overrides,transform,tint?,anim?}
+                       | {primitive,iid,points/ring/pos,...,color?,tint?,anim?} ]
 ```
 
 - **构件以 `pattern` 键引用引擎内置构建模式**（`core/component.PATTERN_REGISTRY`），AI 只产出声明式 `components.yaml`（参数表 + pattern 键），**绝不持有构建代码**——既满足红线性（§3 红线 6），又让构件定义成为可 diff / 可版本化的资产。
 - **裸原语模式**：`primitive: line|shape|dot` 直接声明四原语之一，`points/ring/pos` 为绝对坐标，可选 `color: #RRGGBB`。
-- **颜色支持（按用户要求就绪，主题场景后续接入）**：四原语均有可选 `color` 字段（`#RRGGBB`），渲染时优先于 `ink` 灰度（`render/common.color_of`）；首片仍为灰度，彩色主题经 `style.palette` 着色后续接入。架构已打通，无需改数据模型。
+- **颜色支持**：四原语均有可选 `color` 字段（`#RRGGBB`），渲染时优先于 `ink` 灰度（`render/common.color_of`）。
+- **`tint`（实例级色系，M6a）**：给一个 `#RRGGBB`，该实例的 `ink` 就映射到「纸 → 淡 tint → tint 本色 → 深 tint」四档。
+  这是**故事片的默认配色方式**——远山石青、水纹石绿、孤舟朱砂各走各自色系且仍保留明暗层次；
+  若只用 `tone.palette` 一套三档，全片会压成同一个色相，那正是「线色不鲜亮」的成因。
+  `tint` 是显式指定，**优先于风格的 `grayscale`**（给了颜色却被风格静默忽略，比约束失效更糟）。
+- **`camera`（全局镜头，M6a）**：工程级 `AnimSet`，通道语义与实例 anim 相同，但**绕画布中心**施加，
+  包在整场的合成层上。分工是刻意的：**主体的位移负责叙事，相机的位移负责观感**——
+  没有相机就只能做「物体在画面里挪」，加了相机才有推轨、摇移、由远及近的镜头语言。
+- **动幅纪律（经验，写死以免回退）**：叙事片的位移量应以**画布宽度**为度量（主人公横穿 ≥80% 画布），
+  而不是以「像素级微动」为目标；且**中间关键帧不得正中对称**（见 §14.4 第 2 条）。
 
 > M6a 将对 `style.yaml` 做向后兼容扩展，并新增 `constraints.yaml`，见 §7.2。
 
@@ -414,6 +429,36 @@ CLI：`spol render --project projects/lonely_boat --backend skia --out out.png` 
 1. `color_area` 不能按「有 color 字段的叶节点占比」统计——彩色风格下所有叶节点都会带 color，比值恒为 1，约束失去意义。改为**按色度判定**（RGB 通道极差 > 60 才算彩色；朱砂墨色是暖调，极差仅 17–50，属「墨」不属于「彩」）。
 2. 中间关键帧若取正中对称（t=2），smooth 缓动会使 t 与 4-t 姿态完全相同，96 帧只剩 49 个不同画面（运动变成「出去再原路回来」）。改为**不等距中间键**后 96/96 帧互异，运动成为单向缓流，循环仍无缝。
 
+**审查分工**：`make_official_film.py` 只断言几何 / 构图 / 确定性；**成片必须人工过目**（用户 2026-09-28 明确）——动幅手感与叙事节奏不由脚本判定。
+
+## 14.6 故事片「孤舟渡江 · 三幕」证据（已通过，`test_m6_film.py`）
+
+产物：`examples/lonely_boat_story.{mp4,png,svg,json}`、`lonely_boat_story_manifest.json`、
+`story_snapshots/`（t=0/2/4/6/8/9.9s 分镜格）。
+
+工程：`projects/lonely_boat_story` —— 10s @30fps = 300 帧，16 个实例（10 构件 + 6 只裸原语归鸟），
+16 条实例动画轨 + 3 条相机轨（translate/scale/rotate），风格 `azurite`（石青重彩）。
+
+三幕：I 启程（雾中远山渐显、孤舟自画外入画、相机缓推）→ II 渡江（主舟横穿中景并渐大、月自地平升起、
+群鸟横越拉出纵深、相机跟随）→ III 月明（抵达右侧放缓、相机顶点后回稳、雾尽灯明）。
+
+| 检验项 | 结果 | 硬证据 |
+|---|---|---|
+| 动幅（回归「基本没动」） | ✅ | 主舟自身横移 **1310px = 85% 画布宽**；屏幕空间 -46px → 1311px；半程间画面变化像素 **4.63% / 4.81%** |
+| 帧帧互异 | ✅ | **300/300** 帧哈希互不相同 |
+| 叙事而非循环 | ✅ | 首末姿态不同（`loop_closed=False`）——叙事片**必须**不闭合，否则等于没有故事 |
+| 色彩鲜亮（回归「线色不鲜亮」） | ✅ | 着墨像素平均色度 **67.6**（对比灰度版 1.0）；`azurite` 预设刻意**不设** `color_area_max` |
+| 实例级分色 | ✅ | 16 实例全部带 tint；`tint` 四档停靠点使同一实例内仍有 ≥12 级明度层次 |
+| 全时长校验 | ✅ | 基准姿态与 t=2.5/5.0/7.5s 四处采样均 **0 error / 0 warning** |
+| 成片 | ✅ | 300 帧 @30fps 1600×900 H.264(yuv420p) 10.000s，814 KiB |
+
+**两处引擎能力补齐**（此前做不出「动漫感」，只能靠微调凑）：
+1. `camera` 全局镜头（工程级 AnimSet，绕画布中心）。
+2. `tint` 实例级色系（替代「全片一个色相」的单一调色板）。
+
+**校验器随之修正**：`validate_project(project, t=None)` 现按**风格 + tint 实际着色后**的叶节点计算构图，
+并支持按时刻采样——否则彩色与灰度会算出同一个彩面积，且故事片的构图变化完全不在校验范围内。
+
 ---
 
 ## 15. 库使用纪律（build vs buy 评估，强制）
@@ -462,10 +507,12 @@ Spolvero/
 │   └── ui/                 # M6c（可选 extras [ui]）：Flask 薄壳，仅调用 api.py
 ├── projects/               # 工程资产（声明式）
 │   ├── lonely_boat/        #   静态首片
-│   └── lonely_boat_film/   #   官方示例片（4s 无缝循环，96 帧）
+│   ├── lonely_boat_film/   #   循环片（4s 满环无缝，96 帧）
+│   └── lonely_boat_story/  #   故事片（10s 三幕叙事，300 帧，含 camera 与 tint）
 ├── styles/                 # M6a：可复用风格预设资产 <id>/{style.yaml,constraints.yaml,preview.png}
-│   ├── eastern_minimal/
-│   └── vermilion/
+│   ├── eastern_minimal/    #   东方极简（灰度）
+│   ├── vermilion/          #   朱砂点染（彩，克制的点缀）
+│   └── azurite/            #   石青重彩（鲜亮，故事片默认；不设 color_area_max）
 ├── examples/               # 示例片、接触表、成片产出脚本
 │   └── make_official_film.py   # 校验→金帧→mp4→Lottie→快照→manifest 一条命令走完
 ├── spike/                  # 可行性验证（§14）

@@ -1,0 +1,278 @@
+# 「孤舟渡江 · 三幕」时序层（官方故事片）
+#
+# 幕次（10s @30fps）：
+#   I   启程 0–3.5s   雾中山形渐显；孤舟自画外左侧入画；相机缓推
+#   II  渡江 3.5–7s   主舟横穿中景并渐渐变大；月自地平升起；群鸟横越拉出纵深；相机跟随右移
+#   III 月明 7–10s    主舟抵达右侧并放缓；相机顶点后回稳；雾尽、灯明
+#
+# 通道语义（animation/track.py）：translate 世界系平移增量 / rotate 绕实例锚点 /
+# scale 绕锚点倍率 / ink_shift 全实例 ink 偏移（正=变浅，用于雾中显隐）。
+# tint 为实例级色系（styles/apply.py）：本实例的 ink 映射到「纸→淡→本色→深」四档，
+# 故石青远山、石绿水纹、朱砂孤舟、藤黄月各有其色，且各自仍保留明暗层次。
+items:
+  # ── 月（藤黄）：自地平升起，越到后段越亮 ──
+  - component: moon
+    iid: moon
+    tint: "#E0A22B"
+    overrides: {r: 26, ink: 0.14, halo: true}
+    transform: {translate: [1240, 300]}
+    anim:
+      - channel: translate
+        ease: smooth
+        keys:
+          - {t: 0.0, v: [0, 170]}
+          - {t: 3.5, v: [0, 90]}
+          - {t: 6.5, v: [0, 20]}
+          - {t: 10.0, v: [-70, -16]}
+      - channel: ink_shift
+        ease: smooth
+        keys:
+          - {t: 0.0, v: 0.26}
+          - {t: 3.0, v: 0.02}
+          - {t: 5.0, v: 0.0}
+
+  # ── 三重远山（石青）：雾中渐显 + 视差左移 ——
+  - component: mountain
+    iid: m1
+    tint: "#2E7BB5"
+    overrides: {width: 300, height: 72, ink: 0.80, jag: 0.5}
+    transform: {translate: [300, 372]}
+    anim:
+      - channel: translate
+        ease: smooth
+        keys:
+          - {t: 0.0, v: [0, 0]}
+          - {t: 10.0, v: [-90, 5]}
+      - channel: ink_shift
+        ease: smooth
+        keys:
+          - {t: 0.0, v: 0.34}
+          - {t: 3.0, v: 0.08}
+          - {t: 6.0, v: 0.0}
+  - component: mountain
+    iid: m2
+    tint: "#2E7BB5"
+    overrides: {width: 260, height: 58, ink: 0.83, jag: 0.3}
+    transform: {translate: [900, 356]}
+    anim:
+      - channel: translate
+        ease: smooth
+        keys:
+          - {t: 0.0, v: [0, 0]}
+          - {t: 10.0, v: [-52, 3]}
+      - channel: ink_shift
+        ease: smooth
+        keys:
+          - {t: 0.0, v: 0.30}
+          - {t: 3.5, v: 0.06}
+          - {t: 6.5, v: 0.0}
+  - component: mountain
+    iid: m3
+    tint: "#2E7BB5"
+    overrides: {width: 190, height: 44, ink: 0.86, jag: 0.6}
+    transform: {translate: [1380, 384]}
+    anim:
+      - channel: translate
+        ease: smooth
+        keys:
+          - {t: 0.0, v: [0, 0]}
+          - {t: 10.0, v: [-20, 2]}
+      - channel: ink_shift
+        ease: smooth
+        keys:
+          - {t: 0.0, v: 0.38}
+          - {t: 4.0, v: 0.10}
+          - {t: 7.0, v: 0.0}
+
+  # ── 水纹（石绿）：整体向左滚流，与右行的舟形成相对运动 ──
+  - component: water
+    iid: w1
+    tint: "#3FA36B"
+    overrides: {width: 1000, lines: 4, amp: 4, ink: 0.24, spacing: 16}
+    transform: {translate: [280, 566]}
+    anim:
+      - channel: translate
+        ease: smooth
+        keys:
+          - {t: 0.0, v: [0, 0]}
+          - {t: 2.5, v: [-34, 3]}
+          - {t: 5.0, v: [-70, -3]}
+          - {t: 7.5, v: [-104, 3]}
+          - {t: 10.0, v: [-140, 0]}
+  - component: water
+    iid: w2
+    tint: "#3FA36B"
+    overrides: {width: 620, lines: 3, amp: 3, ink: 0.28, spacing: 15}
+    transform: {translate: [1200, 626]}
+    anim:
+      - channel: translate
+        ease: smooth
+        keys:
+          - {t: 0.0, v: [0, 0]}
+          - {t: 3.0, v: [-26, 2]}
+          - {t: 6.0, v: [-54, -2]}
+          - {t: 10.0, v: [-90, 0]}
+  - component: water
+    iid: w3
+    tint: "#3FA36B"
+    overrides: {width: 900, lines: 3, amp: 5, ink: 0.22, spacing: 19}
+    transform: {translate: [520, 744]}
+    anim:
+      - channel: translate
+        ease: smooth
+        keys:
+          - {t: 0.0, v: [0, 0]}
+          - {t: 2.0, v: [-40, 4]}
+          - {t: 5.0, v: [-84, -4]}
+          - {t: 8.0, v: [-130, 4]}
+          - {t: 10.0, v: [-176, 0]}
+  - component: water
+    iid: w_boat
+    tint: "#3FA36B"
+    overrides: {width: 420, lines: 2, amp: 3, ink: 0.26, spacing: 17}
+    transform: {translate: [880, 700]}
+    anim:
+      - channel: translate
+        ease: smooth
+        keys:
+          - {t: 0.0, v: [0, 0]}
+          - {t: 10.0, v: [-80, 0]}
+
+  # ── 主角：孤舟（朱砂）。自画外左侧入画，横穿近整幅画布，由远及近 ──
+  - component: boat
+    iid: boat_main
+    tint: "#C8442E"
+    overrides: {length: 126, beam_ratio: 0.20, hull_ink: 0.22,
+                has_canopy: true, canopy_w: 0.46, canopy_h: 0.17,
+                has_mast: false, has_lamp: true, tilt: -1.0}
+    transform: {translate: [-120, 662]}
+    anim:
+      - channel: translate
+        ease: smooth
+        keys:
+          - {t: 0.0, v: [0, 10]}
+          - {t: 1.6, v: [210, 2]}
+          - {t: 3.0, v: [400, -8]}
+          - {t: 4.6, v: [620, 6]}
+          - {t: 6.0, v: [790, -8]}
+          - {t: 7.4, v: [950, 5]}
+          - {t: 8.6, v: [1080, -5]}
+          - {t: 10.0, v: [1310, 2]}
+      - channel: rotate
+        ease: smooth
+        keys:
+          - {t: 0.0, v: 0.0}
+          - {t: 1.6, v: -2.0}
+          - {t: 3.0, v: 2.2}
+          - {t: 4.6, v: -1.8}
+          - {t: 6.0, v: 2.4}
+          - {t: 7.4, v: -1.6}
+          - {t: 10.0, v: 0.8}
+      - channel: scale
+        ease: smooth
+        keys:
+          - {t: 0.0, v: 0.78}
+          - {t: 3.0, v: 0.90}
+          - {t: 6.0, v: 1.00}
+          - {t: 10.0, v: 1.06}
+      - channel: ink_shift
+        ease: smooth
+        keys:
+          - {t: 0.0, v: 0.26}
+          - {t: 2.2, v: 0.08}
+          - {t: 4.5, v: 0.0}
+          - {t: 10.0, v: 0.0}
+
+  # ── 远岸小舟（赭石）：反向缓行，与主角形成对位 ──
+  - component: boat
+    iid: boat_far
+    tint: "#B5652F"
+    overrides: {length: 34, beam_ratio: 0.24, hull_ink: 0.52,
+                has_canopy: true, has_mast: false, has_lamp: false, tilt: 0.8}
+    transform: {translate: [1210, 468]}
+    anim:
+      - channel: translate
+        ease: smooth
+        keys:
+          - {t: 0.0, v: [0, 0]}
+          - {t: 10.0, v: [-120, 6]}
+
+  # ── 归鸟（墨青，裸原语 line）：六只 V 形，速度不一，横越全画拉出纵深 ──
+  - primitive: line
+    iid: b1
+    tint: "#1F4E6B"
+    points: [[-46, -16], [0, 0], [46, -16]]
+    width: 2.2
+    ink: 0.16
+    transform: {translate: [-140, 150]}
+    anim:
+      - channel: translate
+        ease: linear
+        keys:
+          - {t: 0.0, v: [0, 0]}
+          - {t: 10.0, v: [2200, -120]}
+  - primitive: line
+    iid: b2
+    tint: "#1F4E6B"
+    points: [[-40, -14], [0, 0], [40, -14]]
+    width: 2.0
+    ink: 0.18
+    transform: {translate: [-260, 196]}
+    anim:
+      - channel: translate
+        ease: linear
+        keys:
+          - {t: 0.0, v: [0, 0]}
+          - {t: 10.0, v: [2260, -90]}
+  - primitive: line
+    iid: b3
+    tint: "#1F4E6B"
+    points: [[-52, -18], [0, 0], [52, -18]]
+    width: 2.4
+    ink: 0.14
+    transform: {translate: [-60, 232]}
+    anim:
+      - channel: translate
+        ease: linear
+        keys:
+          - {t: 0.0, v: [0, 0]}
+          - {t: 10.0, v: [2140, -70]}
+  - primitive: line
+    iid: b4
+    tint: "#1F4E6B"
+    points: [[-34, -12], [0, 0], [34, -12]]
+    width: 1.8
+    ink: 0.20
+    transform: {translate: [-380, 178]}
+    anim:
+      - channel: translate
+        ease: linear
+        keys:
+          - {t: 0.0, v: [0, 0]}
+          - {t: 10.0, v: [2300, -80]}
+  - primitive: line
+    iid: b5
+    tint: "#1F4E6B"
+    points: [[-44, -15], [0, 0], [44, -15]]
+    width: 2.1
+    ink: 0.17
+    transform: {translate: [-200, 262]}
+    anim:
+      - channel: translate
+        ease: linear
+        keys:
+          - {t: 0.0, v: [0, 0]}
+          - {t: 10.0, v: [2180, -60]}
+  - primitive: line
+    iid: b6
+    tint: "#1F4E6B"
+    points: [[-38, -13], [0, 0], [38, -13]]
+    width: 1.9
+    ink: 0.19
+    transform: {translate: [-460, 214]}
+    anim:
+      - channel: translate
+        ease: linear
+        keys:
+          - {t: 0.0, v: [0, 0]}
+          - {t: 10.0, v: [2320, -70]}

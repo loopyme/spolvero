@@ -1,5 +1,6 @@
 {
   "project": "projects/lonely_boat_film",
+  "kind": "loop",
   "seed": "spolvero-lonely-boat-v1",
   "style": "eastern_minimal",
   "size": [
@@ -9,11 +10,44 @@
   "fps": 24,
   "duration": 4.0,
   "frames": 96,
+  "instances": 10,
+  "camera_tracks": 0,
   "loop_closed": true,
+  "unique_frames": 96,
   "validation": {
-    "passed": true,
+    "samples": [
+      {
+        "t": null,
+        "passed": true,
+        "errors": 0,
+        "warnings": 0,
+        "issues": []
+      },
+      {
+        "t": 2.5,
+        "passed": true,
+        "errors": 0,
+        "warnings": 0,
+        "issues": []
+      },
+      {
+        "t": 5.0,
+        "passed": true,
+        "errors": 0,
+        "warnings": 0,
+        "issues": []
+      },
+      {
+        "t": 7.5,
+        "passed": true,
+        "errors": 0,
+        "warnings": 0,
+        "issues": []
+      }
+    ],
     "errors": 0,
-    "warnings": 0
+    "warnings": 0,
+    "passed": true
   },
   "artifacts": {
     "film": {
@@ -25,15 +59,16 @@
       "layers": 10,
       "bytes": 114019
     },
-    "frame_png": {
+    "poster_png": {
       "file": "lonely_boat_film.png",
+      "t": 0.0,
       "sha256": "64de3c735259ea26abdee21a7b8ba3f3cc02f82b68803b02a2ec1565bed9e589"
     },
-    "frame_svg": {
+    "poster_svg": {
       "file": "lonely_boat_film.svg",
       "sha256": "ab6f822f59fde43e376a612a947f40dc6090e584819bc5fb45268efea44eabef"
     },
-    "snapshots": [
+    "storyboard": [
       {
         "t": 0.0,
         "file": "t0000.000.png",
