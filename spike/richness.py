@@ -187,11 +187,13 @@ def styled_leaves(proj, style, t):
     return [recolor(g, style) for g in groups]
 
 
-def draw(canvas, leaves, hatch_amt=0.0, rough=0.0, hollow_fill=False, paper=(248, 241, 221)):
-    """基础绘制（对齐 render/skia.py），可选叠加蚀刻排线与毛边轮廓。
+def draw(canvas, leaves, hatch_amt=0.0, rough=0.0, hollow_fill=False, ramp=0.0,
+         paper=(248, 241, 221)):
+    """基础绘制（对齐 render/skia.py），可选叠加形体明暗 / 蚀刻排线 / 毛边轮廓。
 
-    hollow_fill：把「闭合但只描边」的形状先铺一层极淡的底再排线（参照物的人体衣着就是这么画的）——
-    空心轮廓是最显"矢量幼稚感"的一处，填上淡淡的排线体块立刻有了体积。
+    ramp：形体内部自上而下的明暗渐变（整数 lerp 分带）。这是**无照明模型的"光感"**——
+    参照物的 etch() 也是这个思路：不引入光源，只用「上亮下暗」的排线密度暗示体积。
+    hollow_fill：闭合但只描边的形状先铺极淡底再排线（参照物画衣着的办法）。
     """
     hatch_count = 0
     stroke = skia.Paint()
@@ -228,6 +230,8 @@ def draw(canvas, leaves, hatch_amt=0.0, rough=0.0, hollow_fill=False, paper=(248
             else:
                 fillp.setColor(col)
                 canvas.drawPath(path, fillp)
+            if ramp > 0.0:
+                _ramp_fill(canvas, path, pts, (r, g, b), paper, ramp)
             if hatch_amt > 0.0:
                 hatch_count += _hatch(canvas, leaf, (r, g, b), hatch_amt)
             if rough > 0.0:
@@ -239,6 +243,59 @@ def draw(canvas, leaves, hatch_amt=0.0, rough=0.0, hollow_fill=False, paper=(248
             if rough > 0.0:
                 _rough(canvas, pts, (r, g, b), leaf.width, rough, idx, closed=closed)
     return hatch_count
+
+
+def _ramp_fill(canvas, path, pts, rgb, paper, amount, bands=9):
+    """形体内部自上而下的明暗分带（整数 lerp，确定性）。不引入任何光源。"""
+    xs = [p.x for p in pts]
+    ys = [p.y for p in pts]
+    lo, hi = min(ys), max(ys)
+    x0, x1 = min(xs), max(xs)
+    span = max(hi - lo, 1e-6)
+    light = mix(rgb, paper, 0.14 * amount)
+    dark = darken(rgb, 0.52 * amount)
+    p = skia.Paint()
+    p.setAntiAlias(True)
+    p.setStyle(skia.Paint.kFill_Style)
+    canvas.save()
+    canvas.clipPath(path)
+    for b in range(bands):
+        y0 = lo + span * b / bands
+        y1 = lo + span * (b + 1) / bands
+        c = mix(light, dark, (b + 0.5) / bands)
+        p.setColor(skia.ColorSetARGB(255, c[0], c[1], c[2]))
+        canvas.drawRect(skia.Rect.MakeLTRB(x0 - 6.0, y0 - 0.7, x1 + 6.0, y1 + 0.7), p)
+    canvas.restore()
+
+
+def glow_pass(canvas, leaves, amount=1.0):
+    """点光源晕（月、灯）：同心圆递减 alpha 做径向衰减。
+
+    这是**发光**（emission）而非照明模型——不产生对其它物体的影响，只是画面上的一枚光斑。
+    浮世绘/敦煌的晕染、动漫的光晕都属此类：是图形手段，不是物理光照。
+    """
+    from spolvero.core.scene import flatten_all
+
+    if amount <= 0:
+        return 0
+    p = skia.Paint()
+    p.setAntiAlias(True)
+    p.setStyle(skia.Paint.kFill_Style)
+    n = 0
+    for leaf in flatten_all(leaves):
+        if not isinstance(leaf, InkDot):
+            continue
+        r, g, b = color_of(leaf.ink, leaf.color)
+        layers = 8
+        for k in range(layers, 0, -1):
+            rr = leaf.r * (1.0 + k * 0.40 * amount)
+            a = int(44.0 / k * amount)
+            if a <= 2:
+                continue
+            p.setColor(skia.ColorSetARGB(a, r, g, b))
+            canvas.drawCircle(leaf.pos.x, leaf.pos.y, rr, p)
+        n += 1
+    return n
 
 
 def _path(pts, closed):
@@ -347,14 +404,17 @@ def write_png(arr, path):
     return hashlib.sha256(bytes(data)).hexdigest()
 
 
-def render(proj, style, t, *, hatch=0.0, rough=0.0, hollow=False, material=False, boil=0,
-           vig=0.0, border=False, haze_amt=0.0):
+def render(proj, style, t, *, hatch=0.0, rough=0.0, hollow=False, ramp=0.0, glow=0.0,
+           material=False, boil=0, vig=0.0, border=False, haze_amt=0.0):
     w, h = proj.width, proj.height
     surface = skia.Surface(w, h)
     canvas = surface.getCanvas()
     pr, pg, pb = style.paper_rgb
     canvas.clear(skia.ColorSetARGB(255, pr, pg, pb))
-    n_hatch = draw(canvas, styled_leaves(proj, style, t), hatch, rough, hollow, style.paper_rgb)
+    leaves = styled_leaves(proj, style, t)
+    if glow > 0:
+        glow_pass(canvas, leaves, glow)
+    n_hatch = draw(canvas, leaves, hatch, rough, hollow, ramp, style.paper_rgb)
     if border:
         emulsion_border(canvas, w, h, seed=99 + boil)
     img = surface.makeImageSnapshot()
@@ -374,14 +434,15 @@ def main() -> int:
     style = get_style("azurite", os.path.join(ROOT, "styles"))
     print(f"工程 {os.path.basename(STORY)}  t={T}s  {proj.width}x{proj.height}  style={style.id}")
 
+    LIGHT = dict(ramp=1.0, glow=1.0)  # 无照明模型的「光感」：形体明暗 + 点光晕
     FULL = dict(hatch=0.95, rough=1.0, hollow=True, material=True, vig=0.10,
                 border=True, haze_amt=0.22)
     variants = [
         ("rich_A_flat.png", dict()),
-        ("rich_B_material.png", dict(material=True)),
         ("rich_C_hatch.png", dict(hatch=0.95, rough=1.0, hollow=True)),
         ("rich_D_full.png", dict(FULL)),
-        ("rich_E_full_boil1.png", dict(FULL, boil=1)),
+        ("rich_F_light.png", dict(FULL, **LIGHT)),
+        ("rich_G_light_boil1.png", dict(FULL, **LIGHT, boil=1)),
     ]
     results = {}
     for name, kw in variants:
@@ -392,42 +453,75 @@ def main() -> int:
 
     base = results["rich_A_flat.png"][0]
 
-    # 分区测量：整体 MAD 会被暗角/雾这类全局层带偏，必须分区域看各层到底改了什么
     REGIONS = {
         "背景(留白)": (slice(40, 160), slice(40, 260)),
         "远山(填充形)": (slice(300, 380), slice(160, 440)),
         "主舟(线条)": (slice(560, 800), slice(980, 1420)),
+        "月亮(点光源)": (slice(120, 240), slice(1180, 1300)),
     }
-    print(f"\n{'变体':<24s}" + "".join(f"{k:>16s}" for k in REGIONS) + f"{'整体':>10s}")
-    for name in ("rich_B_material.png", "rich_C_hatch.png", "rich_D_full.png"):
+    print(f"\n{'变体':<22s}" + "".join(f"{k:>15s}" for k in REGIONS) + f"{'整体':>9s}")
+    for name in ("rich_C_hatch.png", "rich_D_full.png", "rich_F_light.png"):
         a = results[name][0]
-        row = f"{name:<24s}"
+        row = f"{name:<22s}"
         for sl in REGIONS.values():
-            row += f"{np.abs(a[sl] - base[sl]).mean():>16.2f}"
-        row += f"{np.abs(a - base).mean():>10.2f}"
+            row += f"{np.abs(a[sl] - base[sl]).mean():>15.2f}"
+        row += f"{np.abs(a - base).mean():>9.2f}"
         print(row)
-    print("（分区 MAD：背景看纹理层；远山看排线层；主舟看毛边层）")
 
-    print("\n纹理强度自检（左上应为纯背景，平涂 std 应≈0）:")
-    for name in ("rich_A_flat.png", "rich_B_material.png", "rich_D_full.png"):
+    # 形体明暗：必须**只量实体内部**。直接量区域内均值会被「山体顶部墨多、底部是留白」的
+    # 覆盖度差异污染（首版就是这么得出「落差 +17」这种反向结论的）。
+    # 做法：用平涂帧当遮罩取出山体像素，再比较形体自身高度的上/下三分之一。
+    paper_lum = float(np.mean(style.paper_rgb))
+    box = (slice(300, 385), slice(150, 470))
+    flat_lum = base[box][:, :, 0]
+    mask = flat_lum < paper_lum - 14.0
+    rows = np.where(mask.any(axis=1))[0]
+    if rows.size >= 6:
+        lo, hi = rows.min(), rows.max()
+        third = max((hi - lo) // 3, 1)
+        top_m = mask[lo : lo + third]
+        bot_m = mask[hi - third : hi + 1]
+        for name in ("rich_A_flat.png", "rich_C_hatch.png", "rich_D_full.png", "rich_F_light.png"):
+            lum = results[name][0][box][:, :, 0]
+            t_ = float(lum[lo : lo + third][top_m].mean())
+            b_ = float(lum[hi - third : hi + 1][bot_m].mean())
+            print(f"  形体内部 {name:22s} 顶部均值 {t_:6.1f} / 底部均值 {b_:6.1f} / 下暗落差 {t_ - b_:+6.1f}")
+
+    # 点光源晕：量月亮中心→外圈的平均亮度是否被抬起
+    moon = base[240:400, 1240:1440, 0]
+    paper_v = paper_lum
+    halo = moon < paper_v - 3.0
+    print(f"\n  月亮光晕（周围本该是纯留白，均值应≈纸色 {paper_v:.0f}）:")
+    means = {}
+    for name in ("rich_A_flat.png", "rich_D_full.png", "rich_F_light.png"):
+        m = results[name][0][240:400, 1240:1440, 0]
+        means[name] = m.mean()
+        print(f"    {name:22s} 该区均值 {m.mean():6.2f} / 低于纸色的像素占比 {100.0 * (m < paper_v - 3.0).mean():5.2f}%")
+    print(f"    光晕净增量（F - D，即关掉/打开光晕的差）= "
+          f"{means['rich_F_light.png'] - means['rich_D_full.png']:+.2f}（负值=暖色光斑压过纸色，符合预期）")
+
+    print("\n纹理强度自检（左上应为纯背景，平涂 std ≈ 0）:")
+    for name in ("rich_A_flat.png", "rich_D_full.png", "rich_F_light.png"):
         patch = results[name][0][40:160, 40:260, 0]
         print(f"  {name:24s} 背景区 std = {patch.std():5.2f}")
 
-    a = results["rich_D_full.png"][0]
-    b = results["rich_E_full_boil1.png"][0]
-    print(f"\n12fps 抖动（boil）换帧 MAD = {np.abs(a - b).mean():.2f}（>0 说明纸纹在跳）")
+    a = results["rich_F_light.png"][0]
+    b = results["rich_G_light_boil1.png"][0]
+    print(f"\n12fps 抖动（boil）换帧 MAD = {np.abs(a - b).mean():.2f}")
 
-    y0, y1, x0, x1 = 560, 800, 980, 1420
-    gap = np.full((y1 - y0, 12, 3), 255.0)
-    for tag, key in (("rich_zoom_flat_vs_full.png", "rich_D_full.png"),):
-        sheet = np.concatenate([base[y0:y1, x0:x1], gap, results[key][0][y0:y1, x0:x1]], axis=1)
+    gap = np.full((240, 12, 3), 255.0)
+    for tag, y0, y1, x0, x1 in (
+        ("rich_zoom_boat.png", 560, 800, 980, 1420),
+        ("rich_zoom_mountain.png", 300, 480, 150, 470),
+        ("rich_zoom_moon.png", 200, 440, 1200, 1460),
+    ):
+        sheet = np.concatenate(
+            [base[y0:y1, x0:x1], gap[: y1 - y0], results["rich_F_light.png"][0][y0:y1, x0:x1]],
+            axis=1,
+        )
         sha = write_png(sheet, os.path.join(OUT, tag))
-        print(f"\n并排对照（左=平涂 右=全效果）{sheet.shape[1]}x{sheet.shape[0]}  sha256={sha[:16]}…")
+        print(f"  局部对照 {tag:26s} {sheet.shape[1]}x{sheet.shape[0]}  sha256={sha[:16]}…")
 
-    y0, y1, x0, x1 = 320, 460, 200, 560
-    sheet = np.concatenate([base[y0:y1, x0:x1], gap[: y1 - y0], results["rich_D_full.png"][0][y0:y1, x0:x1]], axis=1)
-    sha = write_png(sheet, os.path.join(OUT, "rich_zoom_mountain.png"))
-    print(f"远山局部对照（左=平涂 右=全效果）{sheet.shape[1]}x{sheet.shape[0]}  sha256={sha[:16]}…")
     print(f"\n产物目录: {OUT}")
     return 0
 
