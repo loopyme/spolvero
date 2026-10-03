@@ -7,7 +7,7 @@ prompt: |
   线条要见笔意、有顿挫；远山浅墨、近景深墨，主体与留白对歌。构图讲虚实，大面积留白不是空，是气。
   禁止平涂写实光影、禁止高饱和纯色块、禁止把画面铺满不留呼吸。
 default_ink: 0.3
-grayscale: true
+grayscale: false
 fidelity_default: 0.0
 sources: []
 tone:
@@ -15,11 +15,14 @@ tone:
     paper: '#F7F5F0'
     base: '#6E6A64'
     ink: '#1A1A1A'
-  accents: []
-  purity_axis: 0.0
+  accents:
+  - '#9C6B4F'
+  - '#5B7C99'
+  - '#C25B4E'
+  purity_axis: 0.15
 composition:
   whiteness: 0.92
-  color_area: 0.0
+  color_area: 0.05
   density_profile: []
   clustering: 0.32
   region_count: 5

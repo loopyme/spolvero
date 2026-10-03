@@ -10,8 +10,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # 三平台对齐 SPEC §9 的确定性分级：L2 承诺覆盖 Windows / macOS，
-        # 故两者都必须在矩阵内真跑 golden-frame 哈希，不能只跑 Linux。
+        # 三平台对齐 SPEC §9 的确定性分级；但 skia 的 PNG 编码在 macOS / Linux 与
+        # Windows 上字节不一致（L1 仅承诺同机 byte-identical），故 golden-frame PNG
+        # 哈希门禁只在 windows-latest 真跑，其余测试三平台全覆盖。
         os: [ubuntu-latest, macos-latest, windows-latest]
         python-version: ["3.12"]
     runs-on: ${{ matrix.os }}

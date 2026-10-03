@@ -91,3 +91,6 @@ parts/
 films/*/out/
 logs/
 .spolvero/
+
+# ── 风格预览图：引擎自渲染（720x480），测试依赖，必须入库 ──
+!styles/*/preview.png

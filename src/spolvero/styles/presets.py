@@ -24,23 +24,22 @@ from spolvero.styles.asset import (
 _EASTERN_MINIMAL: Dict = {
     "schema_version": SCHEMA_VERSION,
     "id": "eastern_minimal",
-    "name": "东方极简",
+    "name": "彩色水墨",
     "description": (
-        "水墨符号构成：以大量留白为主，线条克制、远山浅墨、焦点元素深墨。"
-        "全片灰度（grayscale=true），不允许出现任何彩色元素。"
+        "宣纸留白之上以墨线为骨，少量低饱和彩色点睛，绝不铺色块。"
     ),
     "default_ink": 0.30,
-    "grayscale": True,
+    "grayscale": False,
     "fidelity_default": 0.0,
     "sources": [],
     "tone": {
         "palette": {"paper": "#F7F5F0", "base": "#6E6A64", "ink": "#1A1A1A"},
-        "accents": [],
-        "purity_axis": 0.0,
+        "accents": ["#9C6B4F", "#5B7C99", "#C25B4E"],
+        "purity_axis": 0.15,
     },
     "composition": {
         "whiteness": 0.92,
-        "color_area": 0.0,
+        "color_area": 0.05,
         "density_profile": [],
         "clustering": 0.32,
         "region_count": 5,
@@ -53,7 +52,7 @@ _EASTERN_MINIMAL_CONSTRAINTS: Dict = {
     "severity": "warning",
     "as_error": [],
     "whitespace_min": 0.80,
-    "color_area_max": 0.0,
+    "color_area_max": 0.08,
     "density_max": 0.020,
     "overlap_max": 0.55,
     "region_count_min": 2,
@@ -66,7 +65,7 @@ _VERMILION: Dict = {
     "id": "vermilion",
     "name": "朱砂点染",
     "description": (
-        "在东方极简骨架上加一层朱砂：主体仍是三档墨色（纸/淡墨/主墨），"
+        "在彩色水墨骨架上加一层朱砂：主体仍是三档墨色（纸/淡墨/主墨），"
         "只让点染元素（小墨点）取朱红 accents[0]。彩面积受约束，避免变成彩色插画。"
     ),
     "default_ink": 0.30,

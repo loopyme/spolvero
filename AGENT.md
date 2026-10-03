@@ -9,6 +9,52 @@ reliable, how to write a programmatic scene script, and how to help the user deb
 > either render a still or encode an MP4. Randomness is derived from `(seed, iid)`,
 > never from a mutable RNG stream — same inputs always produce the same frames.
 
+> **Workflow:** Do NOT jump straight to code. Follow **§0** first — co-create the story and act breakdown with the user across multiple turns before writing any scene script.
+
+---
+
+## 0. 协作流程：先聊故事与分幕，再动手（红线优先）
+
+Spolvero 是确定性符号动画引擎。你的职责不是"尽快吐出一个 mp4"，而是和用户在**多轮对话**里把一部片子的创意先想清楚、对齐，再程序化生成。
+
+**红线——禁止无脑直接生成。** 用户明确授权前，以下动作一律不做：
+- 不要主动 `pip install`、不要创建 `.venv`、不要跑环境搭建。项目通常已自带 venv 与依赖；除非用户明确要求，或运行报错且确认是环境缺失，否则不要碰环境。
+- 不要一上来就写 `encode_film`、不要直接产出成片。
+- 不要替用户拍板主题、时长、画幅、配色——这些必须由用户定。
+
+**四阶段流程（每阶段都先提案 → 等用户回复 → 再推进，绝不跳过）：**
+
+### 阶段一 · 先要故事（Story first）
+写任何代码前，先引导用户讲清他要的片子。可用 `AskUserQuestion` 或直接提问，至少对齐：
+- **主题 / 情绪 / 故事梗概**：叙事型（如"孤舟横渡"）还是纯韵律型（如"春如线"）？想传达什么情绪？
+- **风格参照**：具体指向哪位 / 哪类作品？如吴冠中→江南水乡（白墙黑瓦）、春如线（点彩线）、长城、都市？这决定复用哪个 style preset 与 tints 方案。
+- **时长与画幅**：建议默认 8–12s @30fps、16:9（1600×900，须偶数）；确认后再定。
+- **关键意象清单**：必须出现 / 不必出现的视觉元素（山、水、舟、桥、树、鸟、色点…）。
+
+### 阶段二 · 分幕（Act breakdown）
+基于故事，提出**分幕结构**，用表格呈现并请用户确认 / 调整：
+
+| 幕 | 时长 | 画面内容 | 镜头 / 动画手段 | 情绪 |
+|------|------|----------|----------------|------|
+| 一 | 0–3s | … | `draw` 生长 / 相机推入 | … |
+| 二 | … | … | … | … |
+
+把整片切成 3–5 幕，标注每幕的 `draw` 生长节奏、相机推拉、幕间转场。这是后续动画通道设计的骨架。
+
+### 阶段三 · 视觉方案（Visual plan）
+对齐"怎么画"再写代码，向用户呈现一份方案摘要：
+- **构件清单**：复用哪些内置原型（如 `lonely_boat` 的 `mountain` / `water` / `boat`），需新写哪些（如 `house` / `tree` / `bridge`）。
+- **配色（tints）**：每个实例的 `#RRGGBB` 色系，对照风格 preset 的 `color_area` / `whiteness` 约束，避免超色域。
+- **每幕动画通道**：`translate` / `rotate` / `scale` / `ink_shift` / `draw` / 相机 各自怎么动。
+- 等用户确认方案后再进阶段四。
+
+### 阶段四 · 程序化生成（用户确认后才动手）
+1. 写 `.py` 脚本（见 §5 模板），通过 `sys.path.insert(0,"src")` 或 `PYTHONPATH=src` 挂上库。
+2. **先渲染静帧** `render_project` / `render_frame_at`，让用户肉眼看构图。
+3. 跑 `check_project` 看校验报告，修几何 / 构图问题。
+4. 确认无误后再 `encode_film` 出片。
+5. 成片请用户人工过目节奏与色彩——自动校验管不了审美。
+
 ---
 
 ## 1. Current state (read this first)
@@ -27,6 +73,8 @@ docs. **Not in this repo:** `spike/`, `films/` (per upload scope decision).
 ---
 
 ## 2. Environment setup
+
+> ⚠️ **不要主动搭建环境（见 §0 红线）。** 项目通常已自带 `.venv` 与全部依赖。只有用户明确要求，或运行报错且确认是环境缺失时，才执行下方的安装步骤。无授权不要 `pip install`、不要新建 venv。
 
 Requires **Python ≥ 3.12**. The renderer backend is **skia-python** (needs a prebuilt
 wheel; install in an isolated venv).
@@ -113,6 +161,8 @@ or reuse `lonely_boat` as a template.
 ---
 
 ## 5. How to generate a programmatic scene script (the recommended path)
+
+> 本节只讲"怎么写代码"。**何时写、写给什么创意**由 §0 的四阶段决定：必须先和用户对齐故事与分幕、确认视觉方案，再落笔写脚本。不要跳过 §0 直接进本节。
 
 A "programmatic scene script" is a plain `.py` that builds a `Project` and calls
 `encode_film`. This is what you (the agent) write/edit for the user.
