@@ -316,7 +316,7 @@ _COMMANDS = {
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
         prog="spol",
-        description="Spolvero — Symbol Composition Animator（矢量动画确定性编译层）",
+        description="Spolvero — 判据驱动的确定性动画工作台（人机交互入口：spol studio）",
     )
     p.add_argument("--version", action="version", version=f"spolvero {__version__}")
     sub = p.add_subparsers(dest="cmd")
@@ -374,7 +374,39 @@ def build_parser() -> argparse.ArgumentParser:
     li.add_argument("path")
     li.add_argument("--out", default=None)
 
+    pst2 = sub.add_parser("studio", help="启动 Web 控制台（人机交互的唯一入口）")
+    pst2.add_argument("--host", default="127.0.0.1")
+    pst2.add_argument("--port", type=int, default=8760)
+    pst2.add_argument("--debug", action="store_true")
+
+    pj = sub.add_parser("judge", help="跑影片工程包的判据（结构层 + 构成层）")
+    pj.add_argument("film", help="工程包 id，如 laoshan")
+    pj.add_argument("--scope", default="full", choices=["static", "sound", "full"],
+                    help="static 秒级（不含逐幕重项）；sound 含声音三条；full 全跑")
+
     return p
+
+
+def _cmd_studio(args) -> int:
+    from .webapp.app import main as studio_main
+    return studio_main(host=args.host, port=args.port, debug=args.debug)
+
+
+def _cmd_judge(args) -> int:
+    from .webapp import judges as J
+    r = J.run(args.film, scope=args.scope,
+              progress=lambda d, t, n: print(f"  [{d}/{t}] {n}", flush=True))
+    s = r["summary"]
+    print(f"\n通过 {s['pass']} · 警告 {s['warn']} · 失败 {s['fail']} · 未实现 {s['skip']}"
+          f"（{r['elapsed_s']}s / {r['renders']} 帧）")
+    for i in r["items"]:
+        if i["status"] in ("fail", "warn"):
+            print(f"  [{i['status']}] {i['id']} {i['name']} —— {i['detail']}")
+    return 1 if s["fail"] else 0
+
+
+_COMMANDS["studio"] = _cmd_studio
+_COMMANDS["judge"] = _cmd_judge
 
 
 def main(argv: list[str] | None = None) -> int:

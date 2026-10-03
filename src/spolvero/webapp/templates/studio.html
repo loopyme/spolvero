@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Spolvero · 工作台</title>
+<link rel="stylesheet" href="/static/studio.css?v=13">
+</head>
+<body>
+
+<!-- 顶栏：七个阶段 -->
+<header class="top">
+  <div class="brand">Spolvero</div>
+  <nav class="stages" id="stages"></nav>
+  <div class="spacer"></div>
+  <select id="filmSel" title="切换影片"></select>
+  <span id="keyDot" class="keydot" title="AI 状态">●</span>
+  <button id="btnRefresh" class="ghost" title="重新读取工程状态">刷新</button>
+  <button id="btnSet" class="ghost">设置</button>
+</header>
+
+<main>
+  <!-- 左栏：工程信息 · 幕的选择 · 正在进行的任务 -->
+  <aside id="side">
+    <section class="card">
+      <h3>工程</h3>
+      <div id="projInfo" class="proj"></div>
+    </section>
+    <section class="card">
+      <h3>幕 <span class="muted small" id="actCount"></span></h3>
+      <div id="actPick" class="actpick"></div>
+    </section>
+    <section class="card">
+      <h3>任务</h3>
+      <div id="jobsBox" class="jobs"></div>
+    </section>
+  </aside>
+
+  <!-- 中央：当前阶段 / 当前幕 的具体内容 + 大输入框 -->
+  <section id="center">
+    <div id="stage" class="stage"></div>
+    <div id="askOut" class="askout"></div>
+    <div id="askBar" class="askbar">
+      <textarea id="askInput" placeholder="说这一步要改什么"></textarea>
+      <div class="askfoot">
+        <button id="askSend" class="primary big">发送</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- 右栏：现在该做 · 记录（可拖动）· 警告 -->
+  <aside id="right">
+    <section class="card">
+      <h3>现在该做</h3>
+      <div id="nextBox" class="next"></div>
+    </section>
+    <section class="card grow" id="recCard">
+      <h3>记录 <span class="muted small" id="recCount"></span></h3>
+      <div id="recBox" class="recs"></div>
+    </section>
+    <div class="splitter" id="splitter" title="拖动调整高度"></div>
+    <section class="card" id="warnCard">
+      <h3>警告 <span class="muted small" id="warnCount"></span></h3>
+      <div id="warnBox" class="warns"></div>
+    </section>
+  </aside>
+</main>
+
+<div id="toast" class="toast" hidden></div>
+
+<!-- 图片/视频放大浮层（点击关闭，不新开标签页） -->
+<div id="zoom" class="zoom" hidden></div>
+
+<!-- 设置 -->
+<div id="drawer" class="drawer" hidden>
+  <div class="drawer-box">
+    <h3>设置 · AI 后端</h3>
+    <label>API 密钥<input id="setKey" type="password" placeholder="sk-...（只存本地，不回显）"></label>
+    <label>Base URL<input id="setBase" placeholder="https://api.deepseek.com"></label>
+    <label>模型<input id="setModel" placeholder="deepseek-chat"></label>
+    <div class="muted small" id="setHint"></div>
+    <div id="setTest" class="testline"></div>
+    <div class="row">
+      <button id="btnTestSet" class="ghost">测试连接</button>
+      <button id="btnSaveSet" class="primary">保存</button>
+      <button id="btnCloseSet" class="ghost">关闭</button>
+    </div>
+    <p class="muted small">无密钥＝手工模式：故事与幕表照排（规则生成），检验与渲染照常可用。</p>
+  </div>
+</div>
+
+<!-- 改这一幕 -->
+<div id="editAct" class="drawer" hidden>
+  <div class="drawer-box">
+    <h3>改这一幕</h3>
+    <div class="row2">
+      <label>幕名<input id="eaNote"></label>
+      <label>时长（秒）<input id="eaDur" type="number" step="0.5" min="1.5"></label>
+    </div>
+    <div class="row2">
+      <label>题款上句<input id="eaCap1"></label>
+      <label>题款下句<input id="eaCap2"></label>
+    </div>
+    <label>主体高度（像素，本片画布高 <span id="eaHCanv">900</span>）<input id="eaH" type="number" step="10"></label>
+    <div id="eaMsg" class="testline"></div>
+    <div class="row">
+      <button id="eaOk" class="primary">保存</button>
+      <button id="eaCancel" class="ghost">取消</button>
+    </div>
+    <p class="muted small">改时长会顺延后面所有幕。受影响的那几幕会自动标为"该重做"，别的幕不动。</p>
+  </div>
+</div>
+
+<script src="/static/studio.js?v=13"></script>
+</body>
+</html>

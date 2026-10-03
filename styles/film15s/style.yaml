@@ -1,0 +1,45 @@
+schema_version: 1
+id: film15s
+name: 蚀刻梦境
+description: 暗底蚀刻：近黑纸面、骨色墨线、锈红点睛，叠排线/纸疤/暗角。取自《那部没拍的电影正在拍我》。
+prompt: |
+  本片采用「蚀刻梦境」基调——近黑纸面（不是白纸），骨色墨线（浅米白）勾形，锈红（#9B4930）作唯一的点睛色。
+  叠排线制造蚀刻质感，纸疤与暗角制造旧片感；整体是暗调的、梦的、疏离的。
+  禁止亮底、禁止多种鲜艳颜色、禁止干净无纹理的平涂；质感（排线/纸疤/暗角）是本片的一半。
+default_ink: 0.3
+grayscale: false
+fidelity_default: 0.0
+sources:
+  - '.film-15s/index.html'
+tone:
+  palette:
+    paper: '#171914'
+    base: '#46483A'
+    ink: '#E4D7B4'
+    accents:
+    - '#9B4930'
+    - '#747360'
+  purity_axis: 0.4
+composition:
+  whiteness: 0.35
+  color_area: 0.04
+  density_profile: []
+  clustering: 0.4
+  region_count: 5
+  centroid:
+  - 0.5
+  - 0.55
+  axis_deg: 0.0
+texture:
+  stroke_coherence: 0.2
+  grain: 0.18
+  edge_hardness: 0.9
+effects:
+  material: 0.6
+  ramp: 1.0
+  hatch: 1.0
+  glow: 0.4
+  vignette: 1.0
+  haze: 0.2
+  border: true
+  boil_fps: 12

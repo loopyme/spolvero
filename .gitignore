@@ -22,6 +22,72 @@ Thumbs.db
 .idea/
 .vscode/
 
-# ── 临时渲染产物（CLI 默认输出，已被 gitignore；examples/ 作为展示保留） ──
+# ══════════════════════════════════════════════════════════════════
+# 渲染产物：一律不入库
+#   图 / 视频 / 帧序列 / Lottie / manifest 全是**重跑就能得到**的东西，
+#   体积大、每次重渲染都变，留在仓库只会把 diff 撑爆。
+#   源码（.py）、工程定义（.yaml）、规格（.md）照常入库。
+#   注：本仓库没有 golden 图片依赖 —— 逐字节门禁用**哈希值**，不用图片文件。
+# ══════════════════════════════════════════════════════════════════
+*.mp4
+*.mov
+*.webm
+*.gif
+*.wav
+*.mp3
+*.apng
+*.avif
+*.tif
+*.tiff
+*.psd
+*.hdr
+*.exr
+
+# 图片：默认不入库。确需留一张做封面/文档配图，在文末「例外」加一行显式 ! 规则
+*.png
+*.jpg
+*.jpeg
+*.webp
+*.bmp
+*.ico
+*.svg
+
+# ── 产物目录与清单文件 ──
+examples/**/*.json
+examples/**/*_snapshots/
+examples/film_snapshots/
+examples/story_snapshots/
+examples/link.json
+*.film.json
+*_manifest.json
+spike/out/
+styles/*/preview.png
+
+# ── 例外：这些必须留在仓库（源码 / 工程定义 / 规格）──
+!README.md
+!LICENSE
+!*.py
+!*.md
+!*.yaml
+!*.toml
+!.gitignore
+!.gitattributes
+
+# ── 其他 ──
+.film-15s
 render.svg
 render.png
+
+# ── 明确不入库的目录（上传范围＝核心库 + 示例，见 README / AGENT.md）──
+# spike/  ：实验脚本（含崂山片「真相」脚本），非稳定库代码。
+# films/  ：影片工程包示例，其 adapter 依赖 spike/ 真相脚本，本快照不收。
+# parts/  ：构件草稿（custom/pending），未迁入核心库，暂不入仓。
+# 注：目录级忽略优先于文末的 !*.py / !*.md 例外规则，下列目录整体不跟踪。
+spike/
+films/
+parts/
+
+# 影片工程包产物 + 本地运行状态（SPEC §17）
+films/*/out/
+logs/
+.spolvero/

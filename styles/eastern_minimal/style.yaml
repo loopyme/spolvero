@@ -1,7 +1,11 @@
 schema_version: 1
 id: eastern_minimal
-name: 东方极简
-description: 水墨符号构成：以大量留白为主，线条克制、远山浅墨、焦点元素深墨。全片灰度（grayscale=true），不允许出现任何彩色元素。
+name: 彩色水墨
+description: 宣纸留白之上以墨线为骨，少量低饱和彩色点睛，绝不铺色块。
+prompt: |
+  本片采用「彩色水墨」基调——在宣纸留白之上以墨线为骨，允许少量低饱和彩色（花青、赭石、朱砂）作点睛，但绝不铺色块。
+  线条要见笔意、有顿挫；远山浅墨、近景深墨，主体与留白对歌。构图讲虚实，大面积留白不是空，是气。
+  禁止平涂写实光影、禁止高饱和纯色块、禁止把画面铺满不留呼吸。
 default_ink: 0.3
 grayscale: true
 fidelity_default: 0.0
